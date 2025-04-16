@@ -1,0 +1,50 @@
+# Configurations used for downloading OSM extracts
+
+[server]
+url = "https://download.geofabrik.de"
+
+
+[regions]
+hamburg = "europe/germany/hamburg"
+darmstadt = "europe/germany/hessen"
+
+
+[versions]
+2018 = "180101.osm.pbf"
+2019 = "190101.osm.pbf"
+2020 = "200101.osm.pbf"
+2021 = "210101.osm.pbf"
+2022 = "220101.osm.pbf"
+2023 = "230101.osm.pbf"
+2024 = "240101.osm.pbf"
+latest = "latest.osm.pbf"
+
+
+# Hamburg configurations
+
+[hamburg.areas]
+admin_level = "9"
+
+[hamburg.clip]
+bbox = [9.5, 10.4, 53.3, 53.75]
+
+[hamburg.places]
+entity = ""
+keys = []
+tags.natural = "tree"
+tags."genus:de" = "Eiche"
+
+
+# Darmstadt configurations
+
+[darmstadt.areas]
+admin_level = "9"
+
+[darmstadt.clip]
+admin_level = "6"
+query = "name == 'Darmstadt'"
+
+[darmstadt.places]
+entity = "node"
+keys = ["name"]
+tags.amenity = "post_office"

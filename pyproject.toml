@@ -1,0 +1,29 @@
+[project]
+name = "diner-osm"
+version = "0.1.0"
+description = "Discovering neighborhood resources with OpenStreetMap"
+readme = "README.md"
+authors = [
+    { name = "KatieBSC", email = "42143412+KatieBSC@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "bokeh>=3.7.2",
+    "geopandas>=1.0.1",
+    "matplotlib>=3.10.1",
+    "osmium>=4.0.2",
+]
+
+[project.scripts]
+diner-osm = "diner_osm.cli:main"
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3.5",
+    "ruff>=0.11.2",
+]
+
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

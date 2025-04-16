@@ -1,0 +1,32 @@
+[server]
+url = "https://example.com/"
+
+
+[regions]
+bad-doberan = "europe/germany/mecklenburg-vorpommern"
+good-doberan = "europe/germany/mecklenburg-vorpommern"
+
+
+[versions]
+2021 = "210101.osm.pbf"
+latest = "latest.osm.pbf"
+
+
+[bad-doberan.areas]
+admin_level = "8"
+
+[bad-doberan.clip]
+
+[bad-doberan.places]
+entity = "node"
+keys = ["name"]
+tags.tourism = "attraction"
+tags.memorial = "bust"
+
+
+[good-doberan.areas]
+
+[good-doberan.clip]
+
+[good-doberan.places]
+
