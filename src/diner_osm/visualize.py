@@ -8,6 +8,7 @@ from bokeh.models import (
     TapTool,
     ColorBar,
     RadioButtonGroup,
+    Toggle,
 )
 from bokeh.plotting import figure
 from bokeh.transform import linear_cmap
@@ -61,6 +62,7 @@ def plot_data(
     color_bar = ColorBar(color_mapper=cmap["transform"])
     plot.add_layout(color_bar, "right")
 
+    toggle = Toggle(label="show places", button_type="default", active=False)
     radio_button_group = RadioButtonGroup(labels=CMAP_COLUMNS, active=0)
     slider = Slider(
         start=float(min(area_sources)),
@@ -79,13 +81,20 @@ def plot_data(
 
     geo_source = GeoJSONDataSource(geojson=node_sources[min(area_sources)])
     scatter = plot.scatter(
-        x="x", y="y", size=7, alpha=0.7, source=geo_source, color="red"
+        x="x",
+        y="y",
+        size=5,
+        alpha=0.7,
+        source=geo_source,
+        color="cornsilk",
+        visible=False,
     )
     places = plot.patches(
-        fill_color="red",
-        line_color="red",
+        fill_color="cornsilk",
+        line_color="cornsilk",
         line_width=0.6,
         source=geo_source,
+        visible=False,
     )
 
     slider_callback = CustomJS(
@@ -108,6 +117,19 @@ def plot_data(
         places.data_source.change.emit();
         """,
     )
+    toggle_callback = CustomJS(
+        args=dict(
+            scatter=scatter,
+            places=places,
+        ),
+        code="""
+        scatter.visible = this.active;
+        places.visible = this.active;
+
+        scatter.change.emit();
+        places.change.emit();
+        """,
+    )
     button_callback = CustomJS(
         args=dict(
             areas=areas,
@@ -121,8 +143,9 @@ def plot_data(
         """,
     )
     slider.js_on_change("value", slider_callback)
+    toggle.js_on_click(toggle_callback)
     radio_button_group.js_on_event("button_click", button_callback)
-    column_layout = column(plot, slider, radio_button_group)
+    column_layout = column(plot, slider, toggle, radio_button_group)
 
     taptool = plot.select(type=TapTool)
     taptool.callback = OpenURL(url="@osm_url")
