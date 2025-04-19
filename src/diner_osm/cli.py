@@ -34,6 +34,15 @@ def get_arg_parser(config: DinerOsmConfig) -> ArgumentParser:
             "To consistently use the area version as node version, set to 'false'."
         ),
     )
+    parser.add_argument(
+        "--with-populations",
+        action="store_true",
+        help=(
+            "Enable population data. "
+            "If set, population data for areas will be fetched from wikidata "
+            "and saved to ./data/populations.json"
+        ),
+    )
     return parser
 
 

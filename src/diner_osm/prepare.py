@@ -4,6 +4,7 @@ from pathlib import Path
 import requests
 import json
 import numpy as np
+from numpy.typing import NDArray
 
 from geopandas import GeoDataFrame
 import osmium
@@ -50,6 +51,7 @@ class EnrichAttributes:
 
     def area(self, a):
         geo_props = a.__geo_interface__["properties"]
+        geo_props["wikidata_area"] = geo_props["wikidata"]
         if a.from_way():
             return self.add_attributes(
                 entity="way", id=a.orig_id(), geo_props=geo_props
@@ -148,7 +150,7 @@ SELECT ?place ?population WHERE {{
 
 
 def get_populations(
-    ids: list[str], file: str = "src/diner_osm/data/populations.json"
+    ids: NDArray[np.str_], file: str = "data/populations.json"
 ) -> dict[str, str]:
     try:
         with open(file) as f:
@@ -158,13 +160,14 @@ def get_populations(
     if missing_ids := [x for x in ids if x not in populations]:
         retrieved_pops = fetch_wikidata_populations(ids=missing_ids)
         populations |= {x: retrieved_pops.get(x, "null") for x in missing_ids}
-        print(populations)
         with open(file, mode="w") as f:
             json.dump(populations, f)
     return {x: int(populations[x]) if populations[x] != "null" else np.nan for x in ids}
 
 
-def get_joined_gdf(gdf_areas: GeoDataFrame, gdf_nodes: GeoDataFrame) -> GeoDataFrame:
+def get_joined_gdf(
+    gdf_areas: GeoDataFrame, gdf_nodes: GeoDataFrame, with_populations: bool = False
+) -> GeoDataFrame:
     gdf = gdf_areas.sjoin(
         df=gdf_nodes,
         how="left",
@@ -172,16 +175,18 @@ def get_joined_gdf(gdf_areas: GeoDataFrame, gdf_nodes: GeoDataFrame) -> GeoDataF
         lsuffix="area",
         rsuffix="node",
     )
+    normalize_columns = ["count", "count_by_sqkm"]
     gdf["count"] = gdf.groupby("id_area")["id_node"].transform("count")
     gdf["sqkm"] = gdf.set_crs(epsg=4326).to_crs(epsg=25833).geometry.area / 1_000_000
-    wikidata_col = "wikidata_area" if "wikidata_area" in gdf.columns else "wikidata"
-    populations = get_populations(
-        ids=gdf[gdf[wikidata_col].notnull()][wikidata_col].to_list()
-    )
-    gdf["population"] = gdf[wikidata_col].map(populations)
     gdf["count_by_sqkm"] = gdf["count"] / gdf["sqkm"]
-    gdf["count_by_pop"] = gdf["count"] / gdf["population"]
-    for col in ["count", "count_by_sqkm", "count_by_pop"]:
+    if with_populations:
+        populations = get_populations(
+            ids=gdf[gdf["wikidata_area"].notnull()]["wikidata_area"].unique()
+        )
+        gdf["population"] = gdf["wikidata_area"].map(populations)
+        gdf["count_by_pop"] = gdf["count"] / gdf["population"]
+        normalize_columns.append("count_by_pop")
+    for col in normalize_columns:
         gdf[f"normalize_{col}"] = (gdf[col] - gdf[col].min()) / (
             gdf[col].max() - gdf[col].min()
         )
@@ -191,7 +196,7 @@ def get_joined_gdf(gdf_areas: GeoDataFrame, gdf_nodes: GeoDataFrame) -> GeoDataF
             "name_area": "name",
             "id_area": "id",
             "osm_url_area": "osm_url",
-            wikidata_col: "wikidata",
+            "wikidata_area": "wikidata",
         }
     )
 
@@ -232,5 +237,6 @@ def prepare_data(
         join_gdfs[version] = get_joined_gdf(
             gdf_areas=gdf_areas,
             gdf_nodes=gdf_places,
+            with_populations=options.with_populations,
         )
     return place_gdfs, join_gdfs

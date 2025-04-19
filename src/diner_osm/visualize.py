@@ -45,8 +45,9 @@ def plot_data(
     CMAP_COLUMNS = [
         "normalize_count",
         "normalize_count_by_sqkm",
-        "normalize_count_by_pop",
     ]
+    if options.with_populations:
+        CMAP_COLUMNS.append("normalize_count_by_pop")
 
     # Initial elements
     tags = config.region_configs[options.region].places.tags

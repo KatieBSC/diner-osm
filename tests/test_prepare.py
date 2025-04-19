@@ -106,20 +106,20 @@ def test_extract_places(config: PlacesConfig) -> None:
         assert gdf[~gdf["id"].str.startswith(config.entity[0])].empty
 
 
+@pytest.mark.parametrize("with_populations", [True, False])
 @patch("diner_osm.prepare.get_populations")
-def test_get_joined_gdf(get_populations: MagicMock, gdf: GeoDataFrame) -> None:
+def test_get_joined_gdf(
+    get_populations: MagicMock, with_populations: bool, gdf: GeoDataFrame
+) -> None:
     get_populations.return_value = {"Q9536": 1000}
     gdf_areas = extract_areas(admin_level="8", path=Path("tests/fixtures/test.osm.pbf"))
-    joined_gdf = get_joined_gdf(gdf_areas=gdf_areas, gdf_nodes=gdf)
-    get_populations.assert_called_once_with(ids=["Q9536"])
+    joined_gdf = get_joined_gdf(
+        gdf_areas=gdf_areas, gdf_nodes=gdf, with_populations=with_populations
+    )
     assert_series_equal(
         joined_gdf["name"], pd.Series(["Bad Doberan"]), check_names=False
     )
     assert_series_equal(joined_gdf["count"], pd.Series([1]), check_names=False)
-    assert_series_equal(joined_gdf["population"], pd.Series([1000]), check_names=False)
-    assert_series_equal(
-        joined_gdf["count_by_pop"], pd.Series([1 / 1000]), check_names=False
-    )
     assert_series_equal(
         joined_gdf["sqkm"],
         pd.Series([32.74]),
@@ -136,6 +136,18 @@ def test_get_joined_gdf(get_populations: MagicMock, gdf: GeoDataFrame) -> None:
         atol=0.001,
         rtol=0,
     )
+    if with_populations:
+        get_populations.assert_called_once_with(ids=np.array(["Q9536"]))
+        assert_series_equal(
+            joined_gdf["population"], pd.Series([1000]), check_names=False
+        )
+        assert_series_equal(
+            joined_gdf["count_by_pop"], pd.Series([1 / 1000]), check_names=False
+        )
+    else:
+        get_populations.assert_not_called()
+        assert "population" not in joined_gdf.columns
+        assert "count_by_pop" not in joined_gdf.columns
 
 
 @pytest.mark.parametrize("version_for_areas", ["latest", "false"])

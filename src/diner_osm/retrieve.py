@@ -15,6 +15,7 @@ def get_download_url(config: DinerOsmConfig, region: str, version: str) -> str:
 def download_file(url: str, path: Path, chunk_size=10 * 1024) -> None:
     response = requests.get(url, stream=True)
     response.raise_for_status()
+    path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, mode="wb") as file:
         for chunk in response.iter_content(chunk_size=chunk_size):
             file.write(chunk)
@@ -22,7 +23,7 @@ def download_file(url: str, path: Path, chunk_size=10 * 1024) -> None:
 
 
 def ensure_data(
-    config: DinerOsmConfig, options: Namespace, data_path=Path("src/diner_osm/data")
+    config: DinerOsmConfig, options: Namespace, data_path=Path("data")
 ) -> dict[str, Path]:
     region = options.region
     versions = set(options.versions) | {options.version_for_areas}

@@ -41,8 +41,8 @@ def test_ensure_data(
     unique_versions = set(v for v in versions + [version_for_areas] if v != "false")
     if unique_versions.issubset(diner_osm_config.versions):
         assert ensure_data(config=diner_osm_config, options=test_options) == {
-            "latest": Path("src/diner_osm/data/mecklenburg-vorpommern-latest.osm.pbf"),
-            "2021": Path("src/diner_osm/data/mecklenburg-vorpommern-210101.osm.pbf"),
+            "latest": Path("data/mecklenburg-vorpommern-latest.osm.pbf"),
+            "2021": Path("data/mecklenburg-vorpommern-210101.osm.pbf"),
         }
         assert download_file.call_count == 2
     else:
