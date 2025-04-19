@@ -51,7 +51,7 @@ class EnrichAttributes:
 
     def area(self, a):
         geo_props = a.__geo_interface__["properties"]
-        geo_props["wikidata_area"] = geo_props["wikidata"]
+        geo_props["wikidata_area"] = geo_props.get("wikidata")
         if a.from_way():
             return self.add_attributes(
                 entity="way", id=a.orig_id(), geo_props=geo_props
