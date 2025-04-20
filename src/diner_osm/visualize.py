@@ -52,7 +52,9 @@ def plot_data(
 
     # Initial elements
     tags = config.region_configs[options.region].places.tags
-    tags_str = ",".join([f"{k}={v}" for k, v in tags.items()])
+    keys = config.region_configs[options.region].places.keys
+    tags_str = " ".join([f"{k}={v}" for k, v in tags.items()])
+    tags_str += " " + " ".join([f"{k}=*" for k in keys])
     plot = figure(
         title=f"[{options.region.title()}] {tags_str}",
         tooltips=TOOLTIPS,
