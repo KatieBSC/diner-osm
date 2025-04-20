@@ -1,5 +1,5 @@
 from datetime import datetime
-from bokeh.layouts import column, Column
+from bokeh.layouts import column, row, Row
 from bokeh.models import (
     CustomJS,
     GeoJSONDataSource,
@@ -22,7 +22,7 @@ def plot_data(
     options: Namespace,
     join_gdfs: dict[str, GeoDataFrame],
     node_gdfs: dict[str, GeoDataFrame],
-) -> Column | None:
+) -> Row | None:
     area_sources = {
         (
             datetime.today().strftime("%Y.%m")
@@ -145,8 +145,9 @@ def plot_data(
     slider.js_on_change("value", slider_callback)
     toggle.js_on_click(toggle_callback)
     radio_button_group.js_on_event("button_click", button_callback)
-    column_layout = column(plot, slider, toggle, radio_button_group)
+    column_layout = column(toggle, radio_button_group, slider)
+    layout = row(column_layout,  plot, height=500)
 
     taptool = plot.select(type=TapTool)
     taptool.callback = OpenURL(url="@osm_url")
-    return column_layout
+    return layout
