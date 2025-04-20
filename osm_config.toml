@@ -7,6 +7,7 @@ url = "https://download.geofabrik.de"
 [regions]
 hamburg = "europe/germany/hamburg"
 darmstadt = "europe/germany/hessen"
+frankfurt = "europe/germany/hessen"
 
 
 [versions]
@@ -17,6 +18,7 @@ darmstadt = "europe/germany/hessen"
 2022 = "220101.osm.pbf"
 2023 = "230101.osm.pbf"
 2024 = "240101.osm.pbf"
+2025 = "250101.osm.pbf"
 latest = "latest.osm.pbf"
 
 
@@ -29,7 +31,7 @@ admin_level = "9"
 bbox = [9.5, 10.4, 53.3, 53.75]
 
 [hamburg.places]
-entity = ""
+entity = "node"
 keys = []
 tags.natural = "tree"
 tags."genus:de" = "Eiche"
@@ -45,6 +47,20 @@ admin_level = "6"
 query = "name == 'Darmstadt'"
 
 [darmstadt.places]
-entity = "node"
+entity = ""
 keys = ["name"]
 tags.amenity = "post_office"
+
+
+# Frankfurt configurations
+
+[frankfurt.areas]
+admin_level = "10"
+
+[frankfurt.clip]
+admin_level = "6"
+query = "name == 'Frankfurt am Main'"
+
+[frankfurt.places]
+entity = ""
+keys = ["surveillance"]
