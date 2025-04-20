@@ -180,10 +180,9 @@ def get_joined_gdf(
     gdf["sqkm"] = gdf.set_crs(epsg=4326).to_crs(epsg=25833).geometry.area / 1_000_000
     gdf["count_by_sqkm"] = gdf["count"] / gdf["sqkm"]
     if with_populations:
-        populations = get_populations(
-            ids=gdf[gdf["wikidata_area"].notnull()]["wikidata_area"].unique()
-        )
-        gdf["population"] = gdf["wikidata_area"].map(populations)
+        column = "wikidata_area_area" if "wikidata_area_area" in gdf.columns else "wikidata_area"
+        populations = get_populations(ids=gdf[gdf[column].notnull()][column].unique())
+        gdf["population"] = gdf[column].map(populations)
         gdf["count_by_pop"] = gdf["count"] / gdf["population"]
         normalize_columns.append("count_by_pop")
     for col in normalize_columns:
