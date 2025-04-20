@@ -3,6 +3,7 @@
 
 ![diner-logo](assets/logo.png)
 
+## Demo
 
 https://github.com/user-attachments/assets/ae918333-b1c9-4118-a4a9-d660b0b29301
 
