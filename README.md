@@ -3,6 +3,8 @@
 
 ![diner-logo](assets/logo.png)
 
+![video-clip](assets/video.mov)
+]Map data from OpenStreetMap](https://www.openstreetmap.org/copyright)
 
 ## Installation
 
@@ -20,6 +22,11 @@ uv sync
 ### Run latest
 ```bash
 uv run diner-osm --region darmstadt
+```
+
+### Run with population data enabled
+```bash
+uv run diner-osm --region darmstadt --versions latest --with-populations
 ```
 
 ### Run multiple versions
@@ -74,31 +81,32 @@ latest = "latest.osm.pbf"
 
 # Configurations for each region defined in regions
 
-
-[darmstadt.areas]   # Configurations for plotting areas
+[darmstadt.areas]
 # Boundary hierarchy to use for results, i.e. county / district / neighborhood
 admin_level = "8"
 
 
-[darmstadt.clip]    # Configurations for clipping results
-# bounding box filter
+[darmstadt.clip]
+# Clip results by bounding box
 bbox = [11.901, 54.103, 11.9038, 54.1047]
 
-# query filter
+# Clip results by query
 query = "name == 'Darmstadt'"
 
-# alternative boundary hierarchy to which query filter should be applied
+# Clip results by boundary hierarchy to which query filter should be applied
+# Only applied if query is also provided
 admin_level = "6"
 
 
-[darmstadt.places]  # Configurations for plotting resources
-# OSM entity filter
+[darmstadt.places]
+# Filter by OSM entity
 entity = "node"
 
-# key filter; multiple keys are treated as AND filters
+# Filter by key
+# Ex: Keep places which have a name
 keys = ["name"]
 
-# tag filter; multiple tags are treated as AND filters
-# tags represent key: value pairs
+# Filter by tag
+# Ex: Keep places which have cuisine=ice_cream tag
 tags.cuisine = "ice_cream"
 ```
