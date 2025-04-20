@@ -3,8 +3,11 @@
 
 ![diner-logo](assets/logo.png)
 
-![video-clip](assets/video.mov)
-]Map data from OpenStreetMap](https://www.openstreetmap.org/copyright)
+
+https://github.com/user-attachments/assets/ae918333-b1c9-4118-a4a9-d660b0b29301
+
+
+[Map data from OpenStreetMap](https://www.openstreetmap.org/copyright)
 
 ## Installation
 
