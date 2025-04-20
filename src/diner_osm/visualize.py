@@ -146,7 +146,7 @@ def plot_data(
     toggle.js_on_click(toggle_callback)
     radio_button_group.js_on_event("button_click", button_callback)
     column_layout = column(toggle, radio_button_group, slider)
-    layout = row(column_layout,  plot, height=500)
+    layout = row(column_layout, plot, height=500)
 
     taptool = plot.select(type=TapTool)
     taptool.callback = OpenURL(url="@osm_url")
