@@ -84,14 +84,14 @@ def plot_data(
         x="x",
         y="y",
         size=5,
-        alpha=0.7,
+        alpha=0.8,
         source=geo_source,
-        color="cornsilk",
+        color="white",
         visible=False,
     )
     places = plot.patches(
-        fill_color="cornsilk",
-        line_color="cornsilk",
+        fill_color="white",
+        line_color="white",
         line_width=0.6,
         source=geo_source,
         visible=False,
