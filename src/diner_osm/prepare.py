@@ -196,6 +196,9 @@ def get_joined_gdf(
             "id_area": "id",
             "osm_url_area": "osm_url",
             "wikidata_area": "wikidata",
+            "normalize_count": "total",
+            "normalize_count_by_sqkm": "by_area",
+            "normalize_count_by_pop": "by_population",
         }
     )
 
