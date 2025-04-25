@@ -1,6 +1,8 @@
 # DiNeR-OSM
 **Di**scovering **Ne**ighborhood **R**esources with OpenStreetMap
 
+This project was presented at the [talks](#talks) listed below.
+
 ![diner-logo](assets/logo.png)
 
 ## Demo
@@ -114,3 +116,13 @@ keys = ["name"]
 # Ex: Keep places which have cuisine=ice_cream tag
 tags.cuisine = "ice_cream"
 ```
+
+## Talks
+
+### [PyCon DE & PyData 2025](https://2025.pycon.de/)
+
+The slides used during this talk can be found [here](assets/PyConDE_2025.pdf).
+
+### [PyCon Estonia 2025](https://pycon.ee/)
+
+Upcoming
