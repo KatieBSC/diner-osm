@@ -246,3 +246,20 @@ def prepare_data(
             with_populations=options.with_populations,
         )
     return place_gdfs, join_gdfs
+
+
+def save_data(
+    options: Namespace,
+    place_gdfs: dict[str, GeoDataFrame],
+    join_gdfs: dict[str, GeoDataFrame],
+) -> None:
+    path: Path = options.output_dir
+    path.mkdir(parents=True, exist_ok=True)
+    for version, gdf in place_gdfs.items():
+        filename = Path(path, f"place_{version}.geojson")
+        gdf.to_file(filename, driver="GeoJSON")
+        logging.info(f"Saved gdf to {filename}")
+    for version, gdf in join_gdfs.items():
+        filename = Path(path, f"join_{version}.geojson")
+        gdf.to_file(filename, driver="GeoJSON")
+        logging.info(f"Saved gdf to {filename}")

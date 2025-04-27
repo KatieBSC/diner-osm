@@ -15,6 +15,7 @@ from diner_osm.prepare import (
     extract_places,
     get_joined_gdf,
     prepare_data,
+    save_data,
 )
 
 
@@ -188,3 +189,31 @@ def test_prepare_data(version_for_areas: str, diner_osm_config: DinerOsmConfig) 
             gdf=empty_gdf,
             path=version_paths["latest"],
         )
+
+
+@patch("diner_osm.prepare.GeoDataFrame.to_file")
+def test_save_data(to_file_patch: MagicMock) -> None:
+    options = Namespace(
+        region="bad-doberan",
+        versions=["2021", "latest"],
+        output_dir=Path("data/bad-doberan"),
+    )
+    place_gdfs, join_gdfs = {}, {}
+    for version in options.versions:
+        place_gdfs[version] = GeoDataFrame()
+        join_gdfs[version] = GeoDataFrame()
+    with patch("diner_osm.prepare.Path.mkdir"):
+        save_data(options=options, place_gdfs=place_gdfs, join_gdfs=join_gdfs)
+    assert to_file_patch.call_count == 4
+    to_file_patch.assert_has_calls(
+        [
+            call(Path(f"data/bad-doberan/place_{version}.geojson"), driver="GeoJSON")
+            for version in options.versions
+        ]
+    )
+    to_file_patch.assert_has_calls(
+        [
+            call(Path(f"data/bad-doberan/join_{version}.geojson"), driver="GeoJSON")
+            for version in options.versions
+        ]
+    )
