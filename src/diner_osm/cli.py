@@ -32,7 +32,7 @@ def get_arg_parser(config: DinerOsmConfig) -> ArgumentParser:
         help=(
             "The version to use for plotting areas (default: %(default)s). "
             "Older versions may contain data issues which have been resolved in later versions. "
-            "To consistently use the area version as node version, set to 'false'."
+            "To consistently use the area version as place version, set to 'false'."
         ),
     )
     parent_parser.add_argument(
@@ -74,15 +74,20 @@ def main():
     config = get_config()
     options = get_arg_parser(config).parse_args()
     version_paths = ensure_data(config=config, options=options)
-    node_gdfs, join_gdfs = prepare_data(
+    place_gdfs, join_gdfs = prepare_data(
         config=config, options=options, version_paths=version_paths
     )
     match options.command:
         case "prepare-data":
-            return save_data(options=options, place_gdfs=node_gdfs, join_gdfs=join_gdfs)
+            return save_data(
+                options=options, place_gdfs=place_gdfs, join_gdfs=join_gdfs
+            )
         case "visualize":
             if layout := plot_data(
-                config=config, options=options, join_gdfs=join_gdfs, node_gdfs=node_gdfs
+                config=config,
+                options=options,
+                join_gdfs=join_gdfs,
+                place_gdfs=place_gdfs,
             ):
                 show(layout)
             else:

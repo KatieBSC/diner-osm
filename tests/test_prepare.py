@@ -115,7 +115,7 @@ def test_get_joined_gdf(
     get_populations.return_value = {"Q9536": 1000}
     gdf_areas = extract_areas(admin_level="8", path=Path("tests/fixtures/test.osm.pbf"))
     joined_gdf = get_joined_gdf(
-        gdf_areas=gdf_areas, gdf_nodes=gdf, with_populations=with_populations
+        gdf_areas=gdf_areas, gdf_places=gdf, with_populations=with_populations
     )
     assert_series_equal(
         joined_gdf["name"], pd.Series(["Bad Doberan"]), check_names=False

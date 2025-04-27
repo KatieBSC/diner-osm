@@ -166,10 +166,10 @@ def get_populations(
 
 
 def get_joined_gdf(
-    gdf_areas: GeoDataFrame, gdf_nodes: GeoDataFrame, with_populations: bool = False
+    gdf_areas: GeoDataFrame, gdf_places: GeoDataFrame, with_populations: bool = False
 ) -> GeoDataFrame:
     gdf = gdf_areas.sjoin(
-        df=gdf_nodes,
+        df=gdf_places,
         how="left",
         predicate="contains",
         lsuffix="area",
@@ -242,7 +242,7 @@ def prepare_data(
         place_gdfs[version] = gdf_places
         join_gdfs[version] = get_joined_gdf(
             gdf_areas=gdf_areas,
-            gdf_nodes=gdf_places,
+            gdf_places=gdf_places,
             with_populations=options.with_populations,
         )
     return place_gdfs, join_gdfs

@@ -21,7 +21,7 @@ def plot_data(
     config: DinerOsmConfig,
     options: Namespace,
     join_gdfs: dict[str, GeoDataFrame],
-    node_gdfs: dict[str, GeoDataFrame],
+    place_gdfs: dict[str, GeoDataFrame],
 ) -> Row | None:
     area_sources = {
         (
@@ -31,15 +31,15 @@ def plot_data(
         ): gdf.to_json()
         for version, gdf in join_gdfs.items()
     }
-    node_sources = {
+    place_sources = {
         (
             datetime.today().strftime("%Y.%m")
             if version == "latest"
             else f"{version}.01"
         ): gdf.to_json()
-        for version, gdf in node_gdfs.items()
+        for version, gdf in place_gdfs.items()
     }
-    if not node_sources or not area_sources:
+    if not place_sources or not area_sources:
         return None
 
     TOOLTIPS = [("name", "@name")]
@@ -81,7 +81,7 @@ def plot_data(
         source=geo_source_area,
     )
 
-    geo_source = GeoJSONDataSource(geojson=node_sources[min(area_sources)])
+    geo_source = GeoJSONDataSource(geojson=place_sources[min(area_sources)])
     scatter = plot.scatter(
         x="x",
         y="y",
@@ -103,7 +103,7 @@ def plot_data(
         args=dict(
             areas=areas,
             area_sources=area_sources,
-            sources=node_sources,
+            sources=place_sources,
             scatter=scatter,
             places=places,
         ),
