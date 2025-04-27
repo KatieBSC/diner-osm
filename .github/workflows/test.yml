@@ -26,7 +26,7 @@ jobs:
           python-version-file: "pyproject.toml"
 
       - name: Install dependencies
-        run: uv sync --locked --extra test
+        run: uv sync --extra test
 
       - name: Lint
         run: uv run ruff check
