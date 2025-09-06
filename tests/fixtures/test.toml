@@ -13,7 +13,9 @@ latest = "latest.osm.pbf"
 
 
 [bad-doberan.areas]
-admin_level = "8"
+entity = "area"
+tags.boundary = "administrative"
+tags.admin_level = "8"
 
 [bad-doberan.clip]
 

@@ -1,11 +1,10 @@
 import pytest
 
 from diner_osm.config import (
-    AreasConfig,
+    ClipConfig,
     DinerOsmConfig,
     PlacesConfig,
     RegionConfig,
-    ClipConfig,
 )
 
 
@@ -20,8 +19,11 @@ def diner_osm_config() -> DinerOsmConfig:
         versions={"2021": "210101.osm.pbf", "latest": "latest.osm.pbf"},
         region_configs={
             "bad-doberan": RegionConfig(
-                areas=AreasConfig(admin_level="8"),
-                clip=ClipConfig(admin_level="", bbox=[], query=""),
+                areas=PlacesConfig(
+                    entity="area",
+                    tags={"admin_level": "8", "boundary": "administrative"},
+                ),
+                clip=ClipConfig(),
                 places=PlacesConfig(
                     entity="node",
                     keys=["name"],
@@ -29,9 +31,9 @@ def diner_osm_config() -> DinerOsmConfig:
                 ),
             ),
             "good-doberan": RegionConfig(
-                places=PlacesConfig(entity="", keys=[], tags={}),
-                clip=ClipConfig(admin_level="", bbox=[], query=""),
-                areas=AreasConfig(admin_level="9"),
+                places=PlacesConfig(),
+                clip=ClipConfig(),
+                areas=PlacesConfig(),
             ),
         },
     )

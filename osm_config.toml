@@ -25,7 +25,9 @@ latest = "latest.osm.pbf"
 # Hamburg configurations
 
 [hamburg.areas]
-admin_level = "9"
+entity = "area"
+tags.boundary = "administrative"
+tags.admin_level = "9"
 
 [hamburg.clip]
 bbox = [9.5, 10.4, 53.3, 53.75]
@@ -40,11 +42,15 @@ tags."genus:de" = "Eiche"
 # Darmstadt configurations
 
 [darmstadt.areas]
-admin_level = "9"
+entity = "area"
+tags.boundary = "administrative"
+tags.admin_level = "9"
 
 [darmstadt.clip]
-admin_level = "6"
-query = "name == 'Darmstadt'"
+entity = "area"
+tags.boundary = "administrative"
+tags.admin_level = "6"
+tags.name = "Darmstadt"
 
 [darmstadt.places]
 entity = ""
@@ -55,11 +61,16 @@ tags.amenity = "post_office"
 # Frankfurt configurations
 
 [frankfurt.areas]
-admin_level = "10"
+entity = "area"
+tags.boundary = "administrative"
+tags.admin_level = "10"
+
 
 [frankfurt.clip]
-admin_level = "6"
-query = "name == 'Frankfurt am Main'"
+entity = "area"
+tags.boundary = "administrative"
+tags.admin_level = "6"
+tags.name = "Frankfurt am Main"
 
 [frankfurt.places]
 entity = ""

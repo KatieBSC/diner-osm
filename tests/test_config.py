@@ -1,5 +1,6 @@
 import pytest
-from diner_osm.config import get_config, DinerOsmConfig, ClipConfig, PlacesConfig
+
+from diner_osm.config import ClipConfig, DinerOsmConfig, PlacesConfig, get_config
 
 
 def test_get_config(diner_osm_config: DinerOsmConfig) -> None:

@@ -1,25 +1,26 @@
+import json
 import logging
 from argparse import Namespace
 from pathlib import Path
-import requests
-import json
-import numpy as np
-from numpy.typing import NDArray
 
-from geopandas import GeoDataFrame
+import numpy as np
 import osmium
+import requests
+from geopandas import GeoDataFrame
+from numpy.typing import NDArray
 from osmium.filter import (
+    EmptyTagFilter,
+    EntityFilter,
     GeoInterfaceFilter,
     KeyFilter,
-    EntityFilter,
     TagFilter,
 )
-from osmium.osm import AREA, WAY, RELATION
+
 from diner_osm.config import (
-    ClipConfig,
+    ENTITY_MAPPING,
     DinerOsmConfig,
     PlacesConfig,
-    ENTITY_MAPPING,
+    RegionConfig,
 )
 
 TAGS = ["name", "wikidata"]
@@ -78,11 +79,7 @@ class EnrichAttributes:
 
 def extract_places(config: PlacesConfig, path: Path) -> GeoDataFrame:
     tags_to_keep = TAGS + list(config.tags) + config.keys
-    fp = (
-        osmium.FileProcessor(path)
-        .with_locations()
-        .with_areas(EntityFilter(AREA), EntityFilter(WAY), EntityFilter(RELATION))
-    )
+    fp = osmium.FileProcessor(path).with_areas().with_filter(EmptyTagFilter())
     if config.entity:
         fp.with_filter(EntityFilter(ENTITY_MAPPING[config.entity]))
     for key in config.keys:
@@ -95,38 +92,16 @@ def extract_places(config: PlacesConfig, path: Path) -> GeoDataFrame:
     return GeoDataFrame.from_features(fp).drop_duplicates("id")
 
 
-def extract_areas(admin_level: str, path: Path) -> GeoDataFrame:
-    tags_to_keep = TAGS + ["boundary", "admin_level"]
-    fp = (
-        osmium.FileProcessor(path)
-        .with_areas()
-        .with_filter(EntityFilter(AREA))
-        .with_filter(TagFilter(("boundary", "administrative")))
-        .with_filter(TagFilter(("admin_level", admin_level)))
-        .with_filter(GeoInterfaceFilter(tags=tags_to_keep))
-        .with_filter(EnrichAttributes())
-    )
-    return GeoDataFrame.from_features(fp)
-
-
-def get_clipped_area_gdf(
-    config: ClipConfig,
-    gdf: GeoDataFrame,
-    path: Path,
-) -> GeoDataFrame:
-    if not gdf.empty and config.bbox:
-        logging.info(f"Area is clipped to {config.bbox=}")
-        gdf = gdf.clip(config.bbox)
-    if not gdf.empty and config.query:
-        if config.admin_level:
-            logging.info(
-                f"Area is clipped to {config.admin_level=} and {config.query=}"
-            )
-            area_clip_mask = extract_areas(admin_level=config.admin_level, path=path)
-            gdf = gdf.clip(area_clip_mask.query(config.query))
-        else:
-            logging.info(f"Area is clipped to {config.query=}")
-            gdf = gdf.clip(gdf.query(config.query))
+def extract_areas(region_config: RegionConfig, path: Path) -> GeoDataFrame:
+    gdf = extract_places(config=region_config.areas, path=path)
+    clip_config = region_config.clip
+    if not gdf.empty and clip_config.bbox:
+        logging.info(f"Area is clipped to {clip_config.bbox=}")
+        gdf = gdf.clip(clip_config.bbox)
+    if not gdf.empty and any(clip_config.tags):
+        logging.info(f"Area is clipped to {clip_config.tags=}")
+        clip_mask = extract_places(config=clip_config, path=path)
+        gdf = gdf.clip(clip_mask)
     return gdf
 
 
@@ -173,10 +148,10 @@ def get_joined_gdf(
         how="left",
         predicate="contains",
         lsuffix="area",
-        rsuffix="node",
+        rsuffix="place",
     )
     normalize_columns = ["count", "count_by_sqkm"]
-    gdf["count"] = gdf.groupby("id_area")["id_node"].transform("count")
+    gdf["count"] = gdf.groupby("id_area")["id_place"].transform("count")
     gdf["sqkm"] = gdf.set_crs(epsg=4326).to_crs(epsg=25833).geometry.area / 1_000_000
     gdf["count_by_sqkm"] = gdf["count"] / gdf["sqkm"]
     if with_populations:
@@ -214,22 +189,14 @@ def prepare_data(
     place_gdfs = {}
     join_gdfs = {}
     if options.version_for_areas != "false":
-        gdf_areas = get_clipped_area_gdf(
-            config=region_config.clip,
-            gdf=extract_areas(
-                admin_level=region_config.areas.admin_level,
-                path=version_paths[options.version_for_areas],
-            ),
+        gdf_areas = extract_areas(
+            region_config=region_config,
             path=version_paths[options.version_for_areas],
         )
     for version in options.versions:
         if options.version_for_areas == "false":
-            gdf_areas = get_clipped_area_gdf(
-                config=region_config.clip,
-                gdf=extract_areas(
-                    admin_level=region_config.areas.admin_level,
-                    path=version_paths[version],
-                ),
+            gdf_areas = extract_areas(
+                region_config=region_config,
                 path=version_paths[version],
             )
         gdf_places = extract_places(

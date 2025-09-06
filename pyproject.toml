@@ -20,6 +20,7 @@ diner-osm = "diner_osm.cli:main"
 [project.optional-dependencies]
 test = [
     "pytest>=8.3.5",
+    "pytest-mock>=3.15",
     "ruff>=0.11.2",
 ]
 

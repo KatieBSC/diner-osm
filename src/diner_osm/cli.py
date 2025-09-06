@@ -3,8 +3,8 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 from bokeh.plotting import show
-from diner_osm.config import DinerOsmConfig, get_config
 
+from diner_osm.config import DinerOsmConfig, get_config
 from diner_osm.prepare import prepare_data, save_data
 from diner_osm.retrieve import ensure_data
 from diner_osm.visualize import plot_data

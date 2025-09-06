@@ -1,20 +1,22 @@
+from argparse import Namespace
 from datetime import datetime
-from bokeh.layouts import column, row, Row
+
+from bokeh.layouts import Row, column, row
 from bokeh.models import (
+    ColorBar,
     CustomJS,
     GeoJSONDataSource,
     OpenURL,
+    RadioButtonGroup,
     Slider,
     TapTool,
-    ColorBar,
-    RadioButtonGroup,
     Toggle,
 )
 from bokeh.plotting import figure
 from bokeh.transform import linear_cmap
-from diner_osm.config import DinerOsmConfig
-from argparse import Namespace
 from geopandas import GeoDataFrame
+
+from diner_osm.config import DinerOsmConfig
 
 
 def plot_data(
