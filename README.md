@@ -134,20 +134,21 @@ latest = "latest.osm.pbf"
 # Configurations for each region defined in regions
 
 [darmstadt.areas]
-# Boundary hierarchy to use for results, i.e. county / district / neighborhood
-admin_level = "8"
+# Area filters to use for aggregating results
+entity = "area"
+tags.boundary = "administrative"
+tags.admin_level = "8"
 
 
 [darmstadt.clip]
 # Clip results by bounding box
 bbox = [11.901, 54.103, 11.9038, 54.1047]
 
-# Clip results by query
-query = "name == 'Darmstadt'"
-
-# Clip results by boundary hierarchy to which query filter should be applied
-# Only applied if query is also provided
-admin_level = "6"
+# Clip results by a specific area
+entity = "area"
+tags.boundary = "administrative"
+tags.admin_level = "6"
+tags.name = "Darmstadt"
 
 
 [darmstadt.places]

@@ -1,9 +1,9 @@
-from dataclasses import dataclass, field
 import tomllib
+from dataclasses import dataclass, field
 
-from osmium.osm import NODE, RELATION, WAY
+from osmium.osm import AREA, NODE, RELATION, WAY
 
-ENTITY_MAPPING = {"node": NODE, "way": WAY, "relation": RELATION}
+ENTITY_MAPPING = {"node": NODE, "way": WAY, "relation": RELATION, "area": AREA}
 
 
 @dataclass
@@ -18,10 +18,8 @@ class PlacesConfig:
 
 
 @dataclass
-class ClipConfig:
-    admin_level: str = ""
-    bbox: list[int | float] = field(default_factory=list)
-    query: str = ""
+class ClipConfig(PlacesConfig):
+    bbox: list[float] = field(default_factory=list)
 
     def __post_init__(self):
         if self.bbox:
@@ -29,13 +27,8 @@ class ClipConfig:
 
 
 @dataclass
-class AreasConfig:
-    admin_level: str = "9"
-
-
-@dataclass
 class RegionConfig:
-    areas: AreasConfig
+    areas: PlacesConfig
     clip: ClipConfig
     places: PlacesConfig
 
@@ -57,7 +50,7 @@ def get_config(file: str = "osm_config.toml") -> DinerOsmConfig:
         versions=config["versions"],
         region_configs={
             name: RegionConfig(
-                areas=AreasConfig(**config[name].get("areas")),
+                areas=PlacesConfig(**config[name].get("areas")),
                 clip=ClipConfig(**config[name].get("clip")),
                 places=PlacesConfig(**config[name].get("places")),
             )
