@@ -88,6 +88,20 @@ def test_extract_places(mocker: MockerFixture, config: PlacesConfig) -> None:
         assert gdf[gdf[tag] != value].empty
 
 
+def test_complex_tags() -> None:
+    config = PlacesConfig(
+        tags={"amenity": ["restaurant", "cafe"], "cuisine": ["german", "ice_cream"]},
+    )
+    gdf = extract_places(config=config, path=Path("tests/fixtures/test.osm.pbf"))
+
+    # Should not be empty
+    assert not gdf.empty
+
+    # Should filter tags
+    assert set(gdf["amenity"]) == set(config.tags["amenity"])
+    assert set(gdf["cuisine"]) == set(config.tags["cuisine"])
+
+
 @pytest.mark.parametrize(
     ("bbox", "tags"),
     [

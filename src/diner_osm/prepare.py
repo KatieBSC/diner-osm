@@ -85,7 +85,11 @@ def extract_places(config: PlacesConfig, path: Path) -> GeoDataFrame:
     for key in config.keys:
         fp.with_filter(KeyFilter((key)))
     for key, value in config.tags.items():
-        fp.with_filter(TagFilter((key, value)))
+        if isinstance(value, list):
+            tags = [(key, v) for v in value]
+        else:
+            tags = [(key, value)]
+        fp.with_filter(TagFilter(*tags))
     fp.with_filter(GeoInterfaceFilter(tags=tags_to_keep)).with_filter(
         EnrichAttributes()
     )

@@ -31,4 +31,5 @@ tags.memorial = "bust"
 [good-doberan.clip]
 
 [good-doberan.places]
-
+tags.amenity = ["post_office", "bank"]
+tags.operator = ["Deutsche Post", "Postbank", "Deutsche Post AG"]

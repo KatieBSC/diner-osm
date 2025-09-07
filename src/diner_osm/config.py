@@ -10,7 +10,7 @@ ENTITY_MAPPING = {"node": NODE, "way": WAY, "relation": RELATION, "area": AREA}
 class PlacesConfig:
     entity: str = ""
     keys: list[str] = field(default_factory=list)
-    tags: dict[str, str] = field(default_factory=dict)
+    tags: dict[str, str | list[str]] = field(default_factory=dict)
 
     def __post_init__(self):
         if self.entity:
