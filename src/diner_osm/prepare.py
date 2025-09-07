@@ -163,6 +163,8 @@ def get_joined_gdf(
         populations = get_populations(ids=gdf[gdf[column].notnull()][column].unique())
         gdf["population"] = gdf[column].map(populations)
         gdf["count_by_pop"] = gdf["count"] / gdf["population"]
+        # Handle the case that population is 0
+        gdf.replace([np.inf, -np.inf], np.nan, inplace=True)
         normalize_columns.append("count_by_pop")
     for col in normalize_columns:
         gdf[f"normalize_{col}"] = (gdf[col] - gdf[col].min()) / (
