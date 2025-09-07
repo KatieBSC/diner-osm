@@ -31,7 +31,14 @@ def diner_osm_config() -> DinerOsmConfig:
                 ),
             ),
             "good-doberan": RegionConfig(
-                places=PlacesConfig(),
+                places=PlacesConfig(
+                    entity="",
+                    keys=[],
+                    tags={
+                        "amenity": ["post_office", "bank"],
+                        "operator": ["Deutsche Post", "Postbank", "Deutsche Post AG"],
+                    },
+                ),
                 clip=ClipConfig(),
                 areas=PlacesConfig(),
             ),

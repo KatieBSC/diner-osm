@@ -160,7 +160,8 @@ entity = "node"
 keys = ["name"]
 
 # Filter by tag
-# Ex: Keep places which have cuisine=ice_cream tag
+# Ex: Keep places which have (amenity=cafe OR amenity=restaurant) AND cusine=ice_cream tags
+tags.amenity = ["cafe", "restaurant"]
 tags.cuisine = "ice_cream"
 ```
 
