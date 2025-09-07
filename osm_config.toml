@@ -8,6 +8,7 @@ url = "https://download.geofabrik.de"
 hamburg = "europe/germany/hamburg"
 darmstadt = "europe/germany/hessen"
 frankfurt = "europe/germany/hessen"
+tallinn = "europe/estonia"
 
 
 [versions]
@@ -65,7 +66,6 @@ entity = "area"
 tags.boundary = "administrative"
 tags.admin_level = "10"
 
-
 [frankfurt.clip]
 entity = "area"
 tags.boundary = "administrative"
@@ -75,3 +75,22 @@ tags.name = "Frankfurt am Main"
 [frankfurt.places]
 entity = ""
 keys = ["surveillance"]
+
+
+# Tallinn configurations
+
+[tallinn.areas]
+entity = "area"
+tags.boundary = "administrative"
+tags.admin_level = "10"
+
+[tallinn.clip]
+entity = "area"
+tags.boundary = "administrative"
+tags.admin_level = "7"
+tags.name = "Tallinn"
+
+[tallinn.places]
+entity = ""
+keys = ["name", "artwork_type"]
+tags.tourism = "artwork"
