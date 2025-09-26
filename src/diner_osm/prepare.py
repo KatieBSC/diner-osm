@@ -101,11 +101,11 @@ def extract_areas(region_config: RegionConfig, path: Path) -> GeoDataFrame:
     clip_config = region_config.clip
     if not gdf.empty and clip_config.bbox:
         logging.info(f"Area is clipped to {clip_config.bbox=}")
-        gdf = gdf.clip(clip_config.bbox)
+        gdf = gdf.clip(clip_config.bbox, keep_geom_type=True)
     if not gdf.empty and any(clip_config.tags):
         logging.info(f"Area is clipped to {clip_config.tags=}")
         clip_mask = extract_places(config=clip_config, path=path)
-        gdf = gdf.clip(clip_mask)
+        gdf = gdf.clip(clip_mask, keep_geom_type=True)
     return gdf
 
 
@@ -137,8 +137,10 @@ def get_populations(
     except FileNotFoundError:
         populations = {}
     if missing_ids := [x for x in ids if x not in populations]:
-        retrieved_pops = fetch_wikidata_populations(ids=missing_ids)
-        populations |= {x: retrieved_pops.get(x, "null") for x in missing_ids}
+        chunks = [missing_ids[i : i + 20] for i in range(0, len(missing_ids), 20)]
+        for chunk in chunks:
+            retrieved_pops = fetch_wikidata_populations(ids=chunk)
+            populations |= {x: retrieved_pops.get(x, "null") for x in chunk}
         with open(file, mode="w") as f:
             json.dump(populations, f)
     return {x: int(populations[x]) if populations[x] != "null" else np.nan for x in ids}
