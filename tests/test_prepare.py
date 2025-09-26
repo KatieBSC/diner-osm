@@ -10,7 +10,6 @@ import pytest
 from geopandas import GeoDataFrame
 from pandas.testing import assert_series_equal
 from pytest_mock import MockerFixture
-from shapely.geometry import Point
 
 from diner_osm.config import ClipConfig, DinerOsmConfig, PlacesConfig, RegionConfig
 from diner_osm.prepare import (
@@ -18,179 +17,200 @@ from diner_osm.prepare import (
     extract_areas,
     extract_places,
     get_joined_gdf,
+    get_populations,
     prepare_data,
     save_data,
 )
 
+from .helper import TEST_PATH
 
-@pytest.fixture
-def gdf() -> GeoDataFrame:
-    dct = {
-        "geometry": [
-            Point(11.903, 54.104),
-            Point(25.276, 54.683),
-            Point(-76.567, 39.286),
-        ],
-        "name": ["Frank-Zappa-Denkmal", "Frank Zappa", "Frank Zappa"],
-        "historic": ["memorial", "memorial", np.nan],
-        "memorial": ["bust", "bust", np.nan],
-        "tourism": ["attraction", "attraction", "artwork"],
-        "id": ["n1", "n2", "n3"],
-    }
-    return GeoDataFrame(dct)
+
+@pytest.fixture()
+def cli_options() -> Namespace:
+    return Namespace(
+        region="bad-doberan",
+        version_for_areas="latest",
+        versions=["2021", "latest"],
+        with_populations=False,
+    )
 
 
 @pytest.mark.parametrize(
-    "config",
+    ("config", "expected_ids"),
     [
-        PlacesConfig(
-            entity="node",
-            keys=["name"],
-            tags={"amenity": "cafe", "cuisine": "ice_cream"},
+        (
+            PlacesConfig(
+                entity="node",
+                keys=["name"],
+                tags={"amenity": "cafe", "cuisine": "ice_cream"},
+            ),
+            ["n8", "n9"],
         ),
-        PlacesConfig(entity="way", keys=["leisure"], tags={}),
-        PlacesConfig(entity="way", keys=[], tags={"railway": "tram"}),
-        PlacesConfig(entity="", keys=[], tags={"cuisine": "german"}),
+        (
+            PlacesConfig(
+                entity="node",
+                keys=["name"],
+                tags={"amenity": "cafe", "cuisine": ["ice_cream", "german"]},
+            ),
+            ["n8", "n9", "n10"],
+        ),
+        (
+            PlacesConfig(
+                entity="area",
+                keys=[],
+                tags={"admin_level": "9"},
+            ),
+            ["w2"],
+        ),
     ],
 )
-def test_extract_places(mocker: MockerFixture, config: PlacesConfig) -> None:
-    spy = mocker.spy(GeoDataFrame, "from_features")
-    gdf = extract_places(config=config, path=Path("tests/fixtures/test.osm.pbf"))
+def test_extract_places(
+    mocker: MockerFixture, config: PlacesConfig, expected_ids: list[str]
+) -> None:
+    from_features_spy = mocker.spy(GeoDataFrame, "from_features")
+    gdf = extract_places(config=config, path=Path(TEST_PATH))
 
-    # Should be called with correct filters
-    called_with_filters = spy.call_args[0][0]._filters
-    assert isinstance(called_with_filters[0], osmium.filter.EmptyTagFilter)
-    assert isinstance(called_with_filters[-2], osmium.filter.GeoInterfaceFilter)
-    assert isinstance(called_with_filters[-1], EnrichAttributes)
-    tag_filters = [
-        x for x in called_with_filters if isinstance(x, osmium.filter.TagFilter)
-    ]
-    assert len(config.tags) == len(tag_filters)
-
-    # Should not be empty
-    assert not gdf.empty
-
-    # Should have enriched columns
-    assert {"id", "osm_url"}.issubset(gdf.columns)
-
+    # Contains default + config columns
+    expected_columns = set(
+        ["geometry", "id", "osm_url", "name"] + list(config.tags) + config.keys
+    )
+    assert expected_columns.issubset(gdf.columns)
+    # Should have expected ids
+    assert set(gdf["id"]) == set(expected_ids)
+    # Should filter out objects with no tags
+    expected_filter_types = [osmium.filter.EmptyTagFilter]
     # Should filter for entity
     if config.entity:
-        assert isinstance(called_with_filters[1], osmium.filter.EntityFilter)
-        assert gdf[~gdf["id"].str.startswith(config.entity[0])].empty
-
+        expected_filter_types += [osmium.filter.EntityFilter]
     # Should filter for non-empty keys
+    if config.keys:
+        expected_filter_types += [osmium.filter.KeyFilter]
     for key in config.keys:
-        assert isinstance(called_with_filters[2], osmium.filter.KeyFilter)
-        assert gdf[gdf[key].isna()].empty
-
+        assert (gdf[key].notnull()).all()
     # Should filter for tags
-    for tag, value in config.tags.items():
-        assert gdf[gdf[tag] != value].empty
-
-
-def test_complex_tags() -> None:
-    config = PlacesConfig(
-        tags={"amenity": ["restaurant", "cafe"], "cuisine": ["german", "ice_cream"]},
-    )
-    gdf = extract_places(config=config, path=Path("tests/fixtures/test.osm.pbf"))
-
-    # Should not be empty
-    assert not gdf.empty
-
-    # Should filter tags
-    assert set(gdf["amenity"]) == set(config.tags["amenity"])
-    assert set(gdf["cuisine"]) == set(config.tags["cuisine"])
+    for key, value in config.tags.items():
+        expected_filter_types += [osmium.filter.TagFilter]
+        if isinstance(value, str):
+            assert (gdf[key] == value).all()
+        elif isinstance(value, list):
+            assert (gdf[key].isin(value)).all()
+    # Should be called with correct filters
+    expected_filter_types += [osmium.filter.GeoInterfaceFilter, EnrichAttributes]
+    called_with_filters = from_features_spy.call_args[0][0]._filters
+    for i, filter_type in enumerate(expected_filter_types):
+        assert isinstance(called_with_filters[i], filter_type)
 
 
 @pytest.mark.parametrize(
-    ("bbox", "tags"),
+    ("config", "expected_ids"),
     [
-        ([11.901, 54.103, 11.9038, 54.1047], {}),
-        ([], {"name": "Frank-Zappa-Denkmal"}),
-        ([11.901, 54.103, 11.9038, 54.1047], {"name": "Frank-Zappa-Denkmal"}),
-        ([], {}),
+        (
+            RegionConfig(
+                areas=PlacesConfig(entity="area", tags={"admin_level": "10"}),
+                clip=ClipConfig(),
+                places=PlacesConfig(),
+            ),
+            ["w0", "w1"],
+        ),
+        (
+            RegionConfig(
+                areas=PlacesConfig(entity="area", tags={"admin_level": "10"}),
+                clip=ClipConfig(
+                    entity="area", tags={"admin_level": "9", "name": "way_2"}
+                ),
+                places=PlacesConfig(),
+            ),
+            ["w0"],
+        ),
+        (
+            RegionConfig(
+                areas=PlacesConfig(entity="area", tags={"admin_level": "10"}),
+                clip=ClipConfig(entity="area", bbox=[0, 0, 0.5, 0.5]),
+                places=PlacesConfig(),
+            ),
+            ["w0"],
+        ),
+        (
+            RegionConfig(
+                areas=PlacesConfig(entity="area", tags={"admin_level": "10"}),
+                clip=ClipConfig(
+                    entity="area", bbox=[0, 0, 0.5, 0.5], tags={"name": "way_2"}
+                ),
+                places=PlacesConfig(),
+            ),
+            ["w0"],
+        ),
     ],
-    ids=["bbox", "tags", "bbox-tags", "none"],
+    ids=["none", "tags", "bbox", "bbox-tags"],
 )
-@patch("diner_osm.prepare.extract_places")
 def test_extract_areas(
-    extract_places: MagicMock,
-    bbox: list[float],
-    tags: dict[str, str],
+    config: RegionConfig,
+    expected_ids: list[str],
     mocker: MockerFixture,
-    gdf,
 ) -> None:
-    # Set return value of extract_places to be non-empty GeoDataFrame
-    extract_places.return_value = gdf
-    region_config = RegionConfig(
-        areas=PlacesConfig(),
-        clip=ClipConfig(bbox=bbox, tags=tags),
-        places=PlacesConfig(),
-    )
-    path = Path("fake/path")
     clip_spy = mocker.spy(GeoDataFrame, "clip")
+    gdf = extract_areas(config, TEST_PATH)
+    # Should have expected ids
+    assert set(gdf["id"]) == set(expected_ids)
+    # Should call clip
+    call_count = 0
+    if any(config.clip.bbox):
+        call_count += 1
+    if any(config.clip.tags):
+        call_count += 1
+    assert clip_spy.call_count == call_count
 
-    extract_areas(region_config=region_config, path=path)
 
-    # Should call extract_places with areas config
-    assert extract_places.call_args_list[0] == call(
-        config=region_config.areas, path=path
-    )
-    # Should call clip with bbox
-    if any(bbox):
-        clip_spy.assert_has_calls([call(gdf, bbox)])
-    # Should call extract_places with clip config
-    # Should call clip with clip mask
-    if any(tags):
-        assert extract_places.call_args_list[1] == call(
-            config=region_config.clip, path=path
-        )
-        clip_gdf = gdf if not any(bbox) else gdf.iloc[[0], :]
-        clip_spy.call_args_list[-1] = call(clip_gdf, gdf)
+def test_get_populations() -> None:
+    ids = ["1", "2", "3"]
+    with (
+        patch("json.dump"),
+        patch("builtins.open") as mock_file,
+        patch("diner_osm.prepare.fetch_wikidata_populations") as fetch_populations,
+    ):
+        mock_file.side_effect = [FileNotFoundError, MagicMock()]
+        fetch_populations.return_value = {"1": "100", "2": "0", "3": "null"}
+        assert get_populations(ids, "my/fake-file.json") == {
+            "1": 100,
+            "2": 0,
+            "3": np.nan,
+        }
+        fetch_populations.assert_called_once_with(ids=ids)
 
 
 @pytest.mark.parametrize("with_populations", [True, False])
 @patch("diner_osm.prepare.get_populations")
-def test_get_joined_gdf(
-    get_populations: MagicMock, with_populations: bool, gdf: GeoDataFrame
-) -> None:
-    get_populations.return_value = {"Q9536": 1000}
-    areas_config = PlacesConfig(
-        entity="area", tags={"admin_level": "8", "boundary": "administrative"}
+def test_get_joined_gdf(get_populations: MagicMock, with_populations: bool) -> None:
+    get_populations.return_value = {"Q100": 100, "Q99": np.nan}
+    region_config = RegionConfig(
+        areas=PlacesConfig(entity="area", tags={"admin_level": "10"}),
+        clip=ClipConfig(bbox=[0.25, 0, 2.5, 3]),
+        places=PlacesConfig(entity="node", keys=["name"], tags={"amenity": "cafe"}),
     )
-    gdf_areas = extract_places(
-        config=areas_config, path=Path("tests/fixtures/test.osm.pbf")
-    )
-    joined_gdf = get_joined_gdf(
-        gdf_areas=gdf_areas, gdf_places=gdf, with_populations=with_populations
-    )
+    gdf_areas = extract_areas(region_config, TEST_PATH)
+    gdf_places = extract_places(region_config.places, TEST_PATH)
+    gdf_places = gdf_places.clip(gdf_areas)
+    joined_gdf = get_joined_gdf(gdf_areas, gdf_places, with_populations)
+
+    # Should have expected ids
+    assert_series_equal(joined_gdf["id"], pd.Series(["w0", "w1"]), check_names=False)
+    # Should have expected enriched columns
+    assert_series_equal(joined_gdf["count"], pd.Series([2, 1]), check_names=False)
     assert_series_equal(
-        joined_gdf["name"], pd.Series(["Bad Doberan"]), check_names=False
-    )
-    assert_series_equal(joined_gdf["count"], pd.Series([1]), check_names=False)
-    assert_series_equal(
-        joined_gdf["sqkm"],
-        pd.Series([32.74]),
-        check_names=False,
-        check_exact=False,
-        atol=0.2,
-        rtol=0,
+        joined_gdf["sqkm"], pd.Series([9834.15, 13012.82]), check_names=False
     )
     assert_series_equal(
         joined_gdf["count_by_sqkm"],
-        pd.Series([1 / 32.74]),
+        pd.Series([2 / 9834.15, 1 / 13012.82]),
         check_names=False,
-        check_exact=False,
-        atol=0.001,
-        rtol=0,
     )
     if with_populations:
-        get_populations.assert_called_once_with(ids=np.array(["Q9536"]))
+        get_populations.assert_called_once_with(ids=np.array(["Q100"]))
         assert_series_equal(
-            joined_gdf["population"], pd.Series([1000]), check_names=False
+            joined_gdf["population"], pd.Series([100, np.nan]), check_names=False
         )
         assert_series_equal(
-            joined_gdf["count_by_pop"], pd.Series([1 / 1000]), check_names=False
+            joined_gdf["count_by_pop"], pd.Series([0.02, np.nan]), check_names=False
         )
     else:
         get_populations.assert_not_called()
@@ -199,15 +219,13 @@ def test_get_joined_gdf(
 
 
 @pytest.mark.parametrize("version_for_areas", ["latest", "false"])
-def test_prepare_data(version_for_areas: str, diner_osm_config: DinerOsmConfig) -> None:
-    test_region = "bad-doberan"
-    versions = ["2021", "latest"]
-    options = Namespace(
-        region=test_region,
-        version_for_areas=version_for_areas,
-        versions=versions,
-        with_populations=False,
-    )
+def test_prepare_data(
+    version_for_areas: str, cli_options: Namespace, diner_osm_config: DinerOsmConfig
+) -> None:
+    region = cli_options.region
+    versions = cli_options.versions
+    if version_for_areas == "false":
+        cli_options.version_for_areas = "false"
     version_paths = {"latest": Path("path/to/latest"), "2021": Path("path/to/2021")}
     with (
         patch("diner_osm.prepare.extract_areas") as extract_areas,
@@ -215,23 +233,23 @@ def test_prepare_data(version_for_areas: str, diner_osm_config: DinerOsmConfig) 
         patch("diner_osm.prepare.get_joined_gdf") as get_joined_gdf,
     ):
         extract_places.return_value.empty = False
-        prepare_data(diner_osm_config, options, version_paths)
+        prepare_data(diner_osm_config, cli_options, version_paths)
 
-    # Should call extract_areas for each version
     if version_for_areas == "false":
+        # Should call extract_areas for each version
         extract_areas.assert_has_calls(
             [
                 call(
-                    region_config=diner_osm_config.region_configs[test_region],
+                    region_config=diner_osm_config.region_configs[region],
                     path=version_paths[version],
                 )
                 for version in versions
             ]
         )
-    # Should call extract_areas once
     else:
+        # Should call extract_areas once
         extract_areas.assert_called_once_with(
-            region_config=diner_osm_config.region_configs[test_region],
+            region_config=diner_osm_config.region_configs[region],
             path=version_paths["latest"],
         )
     # Should call extract_places for each version
@@ -242,33 +260,30 @@ def test_prepare_data(version_for_areas: str, diner_osm_config: DinerOsmConfig) 
     get_joined_gdf.assert_called_with(
         gdf_areas=extract_areas(),
         gdf_places=extract_places().clip(),
-        with_populations=options.with_populations,
+        with_populations=cli_options.with_populations,
     )
 
 
 @patch("diner_osm.prepare.GeoDataFrame.to_file")
-def test_save_data(to_file_patch: MagicMock) -> None:
-    options = Namespace(
-        region="bad-doberan",
-        versions=["2021", "latest"],
-        output_dir=Path("data/bad-doberan"),
-    )
+def test_save_data(to_file_patch: MagicMock, cli_options: Namespace) -> None:
+    cli_options.output_dir = Path("data/bad-doberan")
     place_gdfs, join_gdfs = {}, {}
-    for version in options.versions:
+    for version in cli_options.versions:
         place_gdfs[version] = GeoDataFrame()
         join_gdfs[version] = GeoDataFrame()
     with patch("diner_osm.prepare.Path.mkdir"):
-        save_data(options=options, place_gdfs=place_gdfs, join_gdfs=join_gdfs)
+        save_data(cli_options, place_gdfs, join_gdfs)
+    # Should have 2 file calls per version
     assert to_file_patch.call_count == 4
     to_file_patch.assert_has_calls(
         [
             call(Path(f"data/bad-doberan/place_{version}.geojson"), driver="GeoJSON")
-            for version in options.versions
+            for version in cli_options.versions
         ]
     )
     to_file_patch.assert_has_calls(
         [
             call(Path(f"data/bad-doberan/join_{version}.geojson"), driver="GeoJSON")
-            for version in options.versions
+            for version in cli_options.versions
         ]
     )

@@ -7,6 +7,13 @@ from diner_osm.config import (
     RegionConfig,
 )
 
+from .helper import generate_test_data
+
+
+@pytest.fixture(scope="session", autouse=True)
+def write_data() -> None:
+    generate_test_data()
+
 
 @pytest.fixture
 def diner_osm_config() -> DinerOsmConfig:
