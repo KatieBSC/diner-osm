@@ -1,20 +1,34 @@
 import tomllib
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 from osmium.osm import AREA, NODE, RELATION, WAY
 
-ENTITY_MAPPING = {"node": NODE, "way": WAY, "relation": RELATION, "area": AREA}
+
+class EntityNames(StrEnum):
+    area = "area"
+    node = "node"
+    relation = "relation"
+    way = "way"
+
+
+ENTITY_MAPPING = {
+    EntityNames.area: AREA,
+    EntityNames.node: NODE,
+    EntityNames.relation: RELATION,
+    EntityNames.way: WAY,
+}
 
 
 @dataclass
 class PlacesConfig:
-    entity: str = ""
+    entity: EntityNames | None = None
     keys: list[str] = field(default_factory=list)
     tags: dict[str, str | list[str]] = field(default_factory=dict)
 
     def __post_init__(self):
         if self.entity:
-            assert self.entity in ENTITY_MAPPING, "invalid entity"
+            assert self.entity in EntityNames, "invalid entity"
 
 
 @dataclass

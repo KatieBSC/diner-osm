@@ -19,6 +19,7 @@ from osmium.filter import (
 from diner_osm.config import (
     ENTITY_MAPPING,
     DinerOsmConfig,
+    EntityNames,
     PlacesConfig,
     RegionConfig,
 )
@@ -55,25 +56,29 @@ class EnrichAttributes:
         geo_props["wikidata_area"] = geo_props.get("wikidata")
         if a.from_way():
             return self.add_attributes(
-                entity="way", id=a.orig_id(), geo_props=geo_props
+                entity=EntityNames.way, id=a.orig_id(), geo_props=geo_props
             )
         return self.add_attributes(
-            entity="relation", id=a.orig_id(), geo_props=geo_props
+            entity=EntityNames.relation, id=a.orig_id(), geo_props=geo_props
         )
 
     def node(self, n):
         return self.add_attributes(
-            entity="node", id=n.id, geo_props=n.__geo_interface__["properties"]
+            entity=EntityNames.node,
+            id=n.id,
+            geo_props=n.__geo_interface__["properties"],
         )
 
     def way(self, n):
         return self.add_attributes(
-            entity="way", id=n.id, geo_props=n.__geo_interface__["properties"]
+            entity=EntityNames.way, id=n.id, geo_props=n.__geo_interface__["properties"]
         )
 
     def relation(self, n):
         return self.add_attributes(
-            entity="relation", id=n.id, geo_props=n.__geo_interface__["properties"]
+            entity=EntityNames.relation,
+            id=n.id,
+            geo_props=n.__geo_interface__["properties"],
         )
 
 

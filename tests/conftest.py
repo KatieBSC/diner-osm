@@ -39,7 +39,7 @@ def diner_osm_config() -> DinerOsmConfig:
             ),
             "good-doberan": RegionConfig(
                 places=PlacesConfig(
-                    entity="",
+                    entity=None,
                     keys=[],
                     tags={
                         "amenity": ["post_office", "bank"],
