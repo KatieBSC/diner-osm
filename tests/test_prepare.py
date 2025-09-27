@@ -11,7 +11,15 @@ from geopandas import GeoDataFrame
 from pandas.testing import assert_series_equal
 from pytest_mock import MockerFixture
 
-from diner_osm.config import ClipConfig, DinerOsmConfig, PlacesConfig, RegionConfig
+from diner_osm.config import (
+    ClipConfig,
+    Columns,
+    DefaultTags,
+    DinerOsmConfig,
+    EnrichProperties,
+    PlacesConfig,
+    RegionConfig,
+)
 from diner_osm.prepare import (
     EnrichAttributes,
     extract_areas,
@@ -72,11 +80,12 @@ def test_extract_places(
 
     # Contains default + config columns
     expected_columns = set(
-        ["geometry", "id", "osm_url", "name"] + list(config.tags) + config.keys
+        [DefaultTags.name_] + list(EnrichProperties) + list(config.tags) + config.keys
     )
-    assert expected_columns.issubset(gdf.columns)
+    missing = expected_columns - set(gdf.columns)
+    assert not missing, missing
     # Should have expected ids
-    assert set(gdf["id"]) == set(expected_ids)
+    assert set(gdf[EnrichProperties.osm_id]) == set(expected_ids)
     # Should filter out objects with no tags
     expected_filter_types = [osmium.filter.EmptyTagFilter]
     # Should filter for entity
@@ -151,7 +160,7 @@ def test_extract_areas(
     clip_spy = mocker.spy(GeoDataFrame, "clip")
     gdf = extract_areas(config, TEST_PATH)
     # Should have expected ids
-    assert set(gdf["id"]) == set(expected_ids)
+    assert set(gdf[EnrichProperties.osm_id]) == set(expected_ids)
     # Should call clip
     call_count = 0
     if any(config.clip.bbox):
@@ -193,29 +202,35 @@ def test_get_joined_gdf(get_populations: MagicMock, with_populations: bool) -> N
     joined_gdf = get_joined_gdf(gdf_areas, gdf_places, with_populations)
 
     # Should have expected ids
-    assert_series_equal(joined_gdf["id"], pd.Series(["w0", "w1"]), check_names=False)
-    # Should have expected enriched columns
-    assert_series_equal(joined_gdf["count"], pd.Series([2, 1]), check_names=False)
     assert_series_equal(
-        joined_gdf["sqkm"], pd.Series([9834.15, 13012.82]), check_names=False
+        joined_gdf[EnrichProperties.osm_id], pd.Series(["w0", "w1"]), check_names=False
+    )
+    # Should have expected enriched columns
+    assert_series_equal(
+        joined_gdf[Columns.count_], pd.Series([2, 1]), check_names=False
     )
     assert_series_equal(
-        joined_gdf["count_by_sqkm"],
+        joined_gdf[Columns.sqkm], pd.Series([9834.15, 13012.82]), check_names=False
+    )
+    assert_series_equal(
+        joined_gdf[Columns.count_by_sqkm],
         pd.Series([2 / 9834.15, 1 / 13012.82]),
         check_names=False,
     )
     if with_populations:
         get_populations.assert_called_once_with(ids=np.array(["Q100"]))
         assert_series_equal(
-            joined_gdf["population"], pd.Series([100, np.nan]), check_names=False
+            joined_gdf[Columns.population], pd.Series([100, np.nan]), check_names=False
         )
         assert_series_equal(
-            joined_gdf["count_by_pop"], pd.Series([0.02, np.nan]), check_names=False
+            joined_gdf[Columns.count_by_pop],
+            pd.Series([0.02, np.nan]),
+            check_names=False,
         )
     else:
         get_populations.assert_not_called()
-        assert "population" not in joined_gdf.columns
-        assert "count_by_pop" not in joined_gdf.columns
+        assert Columns.population not in joined_gdf.columns
+        assert Columns.count_by_pop not in joined_gdf.columns
 
 
 @pytest.mark.parametrize("version_for_areas", ["latest", "false"])

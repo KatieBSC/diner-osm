@@ -5,6 +5,29 @@ from enum import StrEnum
 from osmium.osm import AREA, NODE, RELATION, WAY
 
 
+class EnrichProperties(StrEnum):
+    osm_id = "osm_id"
+    osm_url = "osm_url"
+    wikidata_id = "wikidata_id"
+
+
+class DefaultTags(StrEnum):
+    name_ = "name"
+    wikidata = "wikidata"
+
+
+class Columns(StrEnum):
+    by_area = "by_area"
+    by_population = "by_population"
+    count_ = "count"
+    count_by_pop = "count_by_pop"
+    count_by_sqkm = "count_by_sqkm"
+    geometry = "geometry"
+    population = "population"
+    sqkm = "sqkm"
+    total = "total"
+
+
 class EntityNames(StrEnum):
     area = "area"
     node = "node"

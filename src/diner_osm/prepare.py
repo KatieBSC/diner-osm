@@ -15,75 +15,55 @@ from osmium.filter import (
     KeyFilter,
     TagFilter,
 )
+from osmium.osm import Area, Node, Relation, Way, osm_entity_bits
 
 from diner_osm.config import (
     ENTITY_MAPPING,
+    Columns,
+    DefaultTags,
     DinerOsmConfig,
+    EnrichProperties,
     EntityNames,
     PlacesConfig,
     RegionConfig,
 )
 
-TAGS = ["name", "wikidata"]
-COLUMNS = [
-    "geometry",
-    "name_area",
-    "wikidata_area",
-    "id_area",
-    "osm_url_area",
-    "count",
-    "sqkm",
-    "population",
-    "count_by_sqkm",
-    "count_by_pop",
-    "normalize_count",
-    "normalize_count_by_sqkm",
-    "normalize_count_by_pop",
-]
-
 
 class EnrichAttributes:
-    def add_attributes(self, entity, id, geo_props):
-        if intersect := {"id", "osm_url"}.intersection(geo_props.keys()):
+    def add_attributes(self, o: osm_entity_bits, id: str, entity_name: EntityNames):
+        geo_interface = getattr(o, "__geo_interface__", None)
+        # Filter out objects without geo_interface
+        if geo_interface is None:
+            logging.warning(f"Removed {entity_name}: {id}. Missing geo_interface.")
+            return True
+        geo_props: dict = geo_interface["properties"]
+        # Filter out objects if properties would be overwritten (should not happen)
+        if intersect := set(EnrichProperties).intersection(geo_props.keys()):
             logging.warning(f"Filtered {id=} with {intersect=}")
             return True
-        geo_props["id"] = f"{entity[0]}{id}"
-        geo_props["osm_url"] = f"https://www.osm.org/{entity}/{id}"
+        geo_props[EnrichProperties.osm_id] = f"{entity_name[0]}{id}"
+        geo_props[EnrichProperties.osm_url] = f"https://www.osm.org/{entity_name}/{id}"
+        geo_props[EnrichProperties.wikidata_id] = geo_props.pop(
+            DefaultTags.wikidata, None
+        )
         return False
 
-    def area(self, a):
-        geo_props = a.__geo_interface__["properties"]
-        geo_props["wikidata_area"] = geo_props.get("wikidata")
+    def area(self, a: Area):
         if a.from_way():
-            return self.add_attributes(
-                entity=EntityNames.way, id=a.orig_id(), geo_props=geo_props
-            )
-        return self.add_attributes(
-            entity=EntityNames.relation, id=a.orig_id(), geo_props=geo_props
-        )
+            return self.add_attributes(a, a.orig_id(), EntityNames.way)
+        return self.add_attributes(a, a.orig_id(), EntityNames.relation)
 
-    def node(self, n):
-        return self.add_attributes(
-            entity=EntityNames.node,
-            id=n.id,
-            geo_props=n.__geo_interface__["properties"],
-        )
+    def node(self, n: Node):
+        return self.add_attributes(n, n.id, EntityNames.node)
 
-    def way(self, n):
-        return self.add_attributes(
-            entity=EntityNames.way, id=n.id, geo_props=n.__geo_interface__["properties"]
-        )
+    def way(self, w: Way):
+        return self.add_attributes(w, w.id, EntityNames.way)
 
-    def relation(self, n):
-        return self.add_attributes(
-            entity=EntityNames.relation,
-            id=n.id,
-            geo_props=n.__geo_interface__["properties"],
-        )
+    def relation(self, r: Relation):
+        return self.add_attributes(r, r.id, EntityNames.relation)
 
 
 def extract_places(config: PlacesConfig, path: Path) -> GeoDataFrame:
-    tags_to_keep = TAGS + list(config.tags) + config.keys
     fp = osmium.FileProcessor(path).with_areas().with_filter(EmptyTagFilter())
     if config.entity:
         fp.with_filter(EntityFilter(ENTITY_MAPPING[config.entity]))
@@ -95,10 +75,11 @@ def extract_places(config: PlacesConfig, path: Path) -> GeoDataFrame:
         else:
             tags = [(key, value)]
         fp.with_filter(TagFilter(*tags))
+    tags_to_keep = list(DefaultTags) + list(config.tags) + config.keys
     fp.with_filter(GeoInterfaceFilter(tags=tags_to_keep)).with_filter(
         EnrichAttributes()
     )
-    return GeoDataFrame.from_features(fp).drop_duplicates("id")
+    return GeoDataFrame.from_features(fp).drop_duplicates(EnrichProperties.osm_id)
 
 
 def extract_areas(region_config: RegionConfig, path: Path) -> GeoDataFrame:
@@ -154,45 +135,53 @@ def get_populations(
 def get_joined_gdf(
     gdf_areas: GeoDataFrame, gdf_places: GeoDataFrame, with_populations: bool = False
 ) -> GeoDataFrame:
+    area, place = "area", "place"
     gdf = gdf_areas.sjoin(
         df=gdf_places,
         how="left",
         predicate="contains",
-        lsuffix="area",
-        rsuffix="place",
+        lsuffix=area,
+        rsuffix=place,
     )
-    normalize_columns = ["count", "count_by_sqkm"]
-    gdf["count"] = gdf.groupby("id_area")["id_place"].transform("count")
-    gdf["sqkm"] = gdf.set_crs(epsg=4326).to_crs(epsg=25833).geometry.area / 1_000_000
-    gdf["count_by_sqkm"] = gdf["count"] / gdf["sqkm"]
+    gdf[Columns.count_] = gdf.groupby(f"{EnrichProperties.osm_id}_{area}")[
+        f"{EnrichProperties.osm_id}_{place}"
+    ].transform("count")
+    gdf[Columns.sqkm] = (
+        gdf.set_crs(epsg=4326).to_crs(epsg=25833).geometry.area / 1_000_000
+    )
+    gdf[Columns.count_by_sqkm] = gdf[Columns.count_] / gdf[Columns.sqkm]
     if with_populations:
-        column = (
-            "wikidata_area_area"
-            if "wikidata_area_area" in gdf.columns
-            else "wikidata_area"
-        )
+        column = f"{EnrichProperties.wikidata_id}_{area}"
         populations = get_populations(ids=gdf[gdf[column].notnull()][column].unique())
-        gdf["population"] = gdf[column].map(populations)
-        gdf["count_by_pop"] = gdf["count"] / gdf["population"]
+        gdf[Columns.population] = gdf[column].map(populations)
+        gdf[Columns.count_by_pop] = gdf[Columns.count_] / gdf[Columns.population]
         # Handle the case that population is 0
         gdf.replace([np.inf, -np.inf], np.nan, inplace=True)
-        normalize_columns.append("count_by_pop")
-    for col in normalize_columns:
+    for col in [Columns.count_, Columns.count_by_sqkm, Columns.count_by_pop]:
+        if col not in gdf:
+            continue
         gdf[f"normalize_{col}"] = (gdf[col] - gdf[col].min()) / (
             gdf[col].max() - gdf[col].min()
         )
-    columns = [c for c in COLUMNS if c in gdf.columns]
-    return gdf.drop_duplicates("id_area")[columns].rename(
+
+    gdf.rename(
         columns={
-            "name_area": "name",
-            "id_area": "id",
-            "osm_url_area": "osm_url",
-            "wikidata_area": "wikidata",
-            "normalize_count": "total",
-            "normalize_count_by_sqkm": "by_area",
-            "normalize_count_by_pop": "by_population",
-        }
+            f"{DefaultTags.name_}_{area}": DefaultTags.name_,
+            f"{DefaultTags.wikidata}_{area}": DefaultTags.wikidata,
+            f"{EnrichProperties.osm_id}_{area}": EnrichProperties.osm_id,
+            f"{EnrichProperties.osm_url}_{area}": EnrichProperties.osm_url,
+            f"normalize_{Columns.count_}": Columns.total,
+            f"normalize_{Columns.count_by_pop}": Columns.by_population,
+            f"normalize_{Columns.count_by_sqkm}": Columns.by_area,
+        },
+        inplace=True,
     )
+    columns = (
+        list(Columns)
+        + list(DefaultTags)
+        + [EnrichProperties.osm_id, EnrichProperties.osm_url]
+    )
+    return gdf.filter(columns).drop_duplicates(EnrichProperties.osm_id)
 
 
 def prepare_data(
