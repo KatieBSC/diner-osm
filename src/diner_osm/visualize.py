@@ -16,7 +16,7 @@ from bokeh.plotting import figure
 from bokeh.transform import linear_cmap
 from geopandas import GeoDataFrame
 
-from diner_osm.config import DinerOsmConfig
+from diner_osm.config import Columns, DefaultTags, DinerOsmConfig, EnrichProperties
 
 
 def plot_data(
@@ -30,7 +30,7 @@ def plot_data(
             datetime.today().strftime("%Y.%m")
             if version == "latest"
             else f"{version}.01"
-        ): gdf.to_json()
+        ): gdf.to_crs(epsg=3857).to_json()
         for version, gdf in join_gdfs.items()
     }
     place_sources = {
@@ -38,19 +38,16 @@ def plot_data(
             datetime.today().strftime("%Y.%m")
             if version == "latest"
             else f"{version}.01"
-        ): gdf.to_json()
+        ): gdf.to_crs(epsg=3857).to_json()
         for version, gdf in place_gdfs.items()
     }
     if not place_sources or not area_sources:
         return None
 
-    TOOLTIPS = [("name", "@name")]
-    CMAP_COLUMNS = [
-        "total",
-        "by_area",
-    ]
+    TOOLTIPS = [(DefaultTags.name_, f"@{DefaultTags.name_}")]
+    CMAP_COLUMNS = [Columns.total, Columns.by_area]
     if options.with_populations:
-        CMAP_COLUMNS.append("by_population")
+        CMAP_COLUMNS.append(Columns.by_population)
 
     # Initial elements
     tags = config.region_configs[options.region].places.tags
@@ -62,6 +59,7 @@ def plot_data(
         tooltips=TOOLTIPS,
         tools="box_zoom,reset,tap",
     )
+    plot.axis.visible = False
     cmap = linear_cmap(CMAP_COLUMNS[0], "Viridis256", 0, 1)
     color_bar = ColorBar(color_mapper=cmap["transform"])
     plot.add_layout(color_bar, "right")
@@ -153,5 +151,5 @@ def plot_data(
     layout = row(column_layout, plot, height=500)
 
     taptool = plot.select(type=TapTool)
-    taptool.callback = OpenURL(url="@osm_url")
+    taptool.callback = OpenURL(url=f"@{EnrichProperties.osm_url}")
     return layout

@@ -79,7 +79,9 @@ def extract_places(config: PlacesConfig, path: Path) -> GeoDataFrame:
     fp.with_filter(GeoInterfaceFilter(tags=tags_to_keep)).with_filter(
         EnrichAttributes()
     )
-    return GeoDataFrame.from_features(fp).drop_duplicates(EnrichProperties.osm_id)
+    return GeoDataFrame.from_features(fp, crs=4326).drop_duplicates(
+        EnrichProperties.osm_id
+    )
 
 
 def extract_areas(region_config: RegionConfig, path: Path) -> GeoDataFrame:
@@ -146,9 +148,7 @@ def get_joined_gdf(
     gdf[Columns.count_] = gdf.groupby(f"{EnrichProperties.osm_id}_{area}")[
         f"{EnrichProperties.osm_id}_{place}"
     ].transform("count")
-    gdf[Columns.sqkm] = (
-        gdf.set_crs(epsg=4326).to_crs(epsg=25833).geometry.area / 1_000_000
-    )
+    gdf[Columns.sqkm] = gdf.to_crs(epsg=32633).geometry.area / 1_000_000
     gdf[Columns.count_by_sqkm] = gdf[Columns.count_] / gdf[Columns.sqkm]
     if with_populations:
         column = f"{EnrichProperties.wikidata_id}_{area}"
