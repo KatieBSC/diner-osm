@@ -1,3 +1,4 @@
+import logging
 import tomllib
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -68,6 +69,16 @@ class RegionConfig:
     areas: PlacesConfig
     clip: ClipConfig
     places: PlacesConfig
+
+    def __post_init__(self):
+        for attr in ["areas", "clip"]:
+            config = getattr(self, attr, None)
+            assert isinstance(config, PlacesConfig)
+            if config.entity is not None:
+                logging.warning(
+                    f"Overwriting provided '{config.entity}' to '{EntityNames.area}' for RegionConfig.{attr} EntityFilter"
+                )
+            config.entity = EntityNames.area
 
 
 @dataclass

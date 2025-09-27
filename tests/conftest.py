@@ -30,7 +30,7 @@ def diner_osm_config() -> DinerOsmConfig:
                     entity="area",
                     tags={"admin_level": "8", "boundary": "administrative"},
                 ),
-                clip=ClipConfig(),
+                clip=ClipConfig(entity="area"),
                 places=PlacesConfig(
                     entity="node",
                     keys=["name"],
@@ -38,6 +38,8 @@ def diner_osm_config() -> DinerOsmConfig:
                 ),
             ),
             "good-doberan": RegionConfig(
+                areas=PlacesConfig(entity="area"),
+                clip=ClipConfig(entity="area"),
                 places=PlacesConfig(
                     entity=None,
                     keys=[],
@@ -46,8 +48,6 @@ def diner_osm_config() -> DinerOsmConfig:
                         "operator": ["Deutsche Post", "Postbank", "Deutsche Post AG"],
                     },
                 ),
-                clip=ClipConfig(),
-                areas=PlacesConfig(),
             ),
         },
     )

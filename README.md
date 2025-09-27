@@ -135,7 +135,7 @@ latest = "latest.osm.pbf"
 
 [darmstadt.areas]
 # Area filters to use for aggregating results
-entity = "area"
+# Uses entity = "area" if any tags provided
 tags.boundary = "administrative"
 tags.admin_level = "8"
 
@@ -145,7 +145,7 @@ tags.admin_level = "8"
 bbox = [11.901, 54.103, 11.9038, 54.1047]
 
 # Clip results by a specific area
-entity = "area"
+# Uses entity = "area" if any tags provided
 tags.boundary = "administrative"
 tags.admin_level = "6"
 tags.name = "Darmstadt"
