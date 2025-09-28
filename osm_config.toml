@@ -26,7 +26,6 @@ latest = "latest.osm.pbf"
 # Hamburg configurations
 
 [hamburg.areas]
-entity = "area"
 tags.boundary = "administrative"
 tags.admin_level = "9"
 
@@ -35,7 +34,6 @@ bbox = [9.5, 10.4, 53.3, 53.75]
 
 [hamburg.places]
 entity = "node"
-keys = []
 tags.natural = "tree"
 tags."genus:de" = "Eiche"
 
@@ -43,18 +41,15 @@ tags."genus:de" = "Eiche"
 # Darmstadt configurations
 
 [darmstadt.areas]
-entity = "area"
 tags.boundary = "administrative"
 tags.admin_level = "9"
 
 [darmstadt.clip]
-entity = "area"
 tags.boundary = "administrative"
 tags.admin_level = "6"
 tags.name = "Darmstadt"
 
 [darmstadt.places]
-entity = ""
 keys = ["name"]
 tags.amenity = "post_office"
 
@@ -62,35 +57,29 @@ tags.amenity = "post_office"
 # Frankfurt configurations
 
 [frankfurt.areas]
-entity = "area"
 tags.boundary = "administrative"
 tags.admin_level = "10"
 
 [frankfurt.clip]
-entity = "area"
 tags.boundary = "administrative"
 tags.admin_level = "6"
 tags.name = "Frankfurt am Main"
 
 [frankfurt.places]
-entity = ""
 keys = ["surveillance"]
 
 
 # Tallinn configurations
 
 [tallinn.areas]
-entity = "area"
 tags.boundary = "administrative"
-tags.admin_level = "10"
+tags.admin_level = "9"
 
 [tallinn.clip]
-entity = "area"
 tags.boundary = "administrative"
 tags.admin_level = "7"
 tags.name = "Tallinn"
 
 [tallinn.places]
-entity = ""
 keys = ["name", "artwork_type"]
 tags.tourism = "artwork"
