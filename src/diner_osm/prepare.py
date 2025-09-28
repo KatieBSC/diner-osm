@@ -118,7 +118,7 @@ SELECT ?place ?population WHERE {{
 
 def get_populations(
     ids: NDArray[np.str_], file: str = "data/populations.json"
-) -> dict[str, str]:
+) -> dict[str, float]:
     try:
         with open(file) as f:
             populations = json.load(f)
@@ -131,7 +131,10 @@ def get_populations(
             populations |= {x: retrieved_pops.get(x, "null") for x in chunk}
         with open(file, mode="w") as f:
             json.dump(populations, f)
-    return {x: int(populations[x]) if populations[x] != "null" else np.nan for x in ids}
+    return {
+        x: float(populations[x]) if str(populations[x]).isnumeric() else np.nan
+        for x in ids
+    }
 
 
 def get_joined_gdf(
@@ -172,9 +175,13 @@ def get_joined_gdf(
             ids=gdf[gdf[wiki_col].notnull()][wiki_col].unique()
         )
         gdf[Columns.population.value] = gdf[wiki_col].map(populations)
-        gdf[Columns.total_by_pop.value] = gdf[Columns.total] / gdf[Columns.population]
         # Handle the case that population is 0
-        gdf.replace([np.inf, -np.inf], np.nan, inplace=True)
+        gdf[Columns.total_by_pop.value] = gdf.apply(
+            lambda row: row[Columns.total] / row[Columns.population]
+            if row[Columns.population] > 0
+            else np.nan,
+            axis=1,
+        )
         gdf[Columns.by_population.value] = normalize(gdf[Columns.total_by_pop])
 
     osm_id_cols = [EnrichProperties.osm_id.suffix(s) for s in [area, place]]

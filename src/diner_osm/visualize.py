@@ -1,6 +1,7 @@
 from argparse import Namespace
 from datetime import datetime
 
+import xyzservices.providers as xyz
 from bokeh.layouts import Row, column, row
 from bokeh.models import (
     ColorBar,
@@ -63,13 +64,20 @@ def plot_data(
     keys = config.region_configs[options.region].places.keys
     tags_str = " ".join([f"{k}={v}" for k, v in tags.items()])
     tags_str += " " + " ".join([f"{k}=*" for k in keys])
+    # Assume bounds do not change much between latest and other versions
+    bounds = gdfs[max(gdfs)].to_crs(epsg=3857).total_bounds
     plot = figure(
         title=f"[{options.region.title()}] {tags_str}",
         tooltips=TOOLTIPS,
         tools="box_zoom,reset,tap",
+        x_range=(bounds[0], bounds[2]),
+        y_range=(bounds[1], bounds[3]),
+        x_axis_type="mercator",
+        y_axis_type="mercator",
     )
+    plot.add_tile(xyz.OpenStreetMap.Mapnik)
     plot.axis.visible = False
-    cmap = linear_cmap(CMAP_COLUMNS[0], "Viridis256", 0, 1)
+    cmap = linear_cmap(CMAP_COLUMNS[0], "Cividis256", 0, 1)
     color_bar = ColorBar(color_mapper=cmap["transform"])
     plot.add_layout(color_bar, "right")
 
@@ -87,6 +95,7 @@ def plot_data(
         fill_color=cmap,
         line_color="black",
         line_width=0.6,
+        alpha=0.6,
         source=geo_source_area,
     )
 
@@ -104,6 +113,7 @@ def plot_data(
         fill_color="white",
         line_color="white",
         line_width=0.6,
+        alpha=0.8,
         source=geo_source,
         visible=False,
     )

@@ -79,7 +79,7 @@ class RegionConfig:
         for attr in ["areas", "clip"]:
             config = getattr(self, attr, None)
             assert isinstance(config, PlacesConfig)
-            if config.entity is not None:
+            if (config.entity) and (config.entity != EntityNames.area):
                 logging.warning(
                     f"Overwriting provided '{config.entity}' to '{EntityNames.area}' for RegionConfig.{attr} EntityFilter"
                 )
