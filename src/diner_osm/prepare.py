@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import osmium
 import requests
-from geopandas import GeoDataFrame
+from geopandas import GeoDataFrame, GeoSeries
 from numpy.typing import NDArray
 from osmium.filter import (
     EmptyTagFilter,
@@ -15,70 +15,55 @@ from osmium.filter import (
     KeyFilter,
     TagFilter,
 )
+from osmium.osm import Area, Node, Relation, Way, osm_entity_bits
 
 from diner_osm.config import (
     ENTITY_MAPPING,
+    Columns,
+    DefaultTags,
     DinerOsmConfig,
+    EnrichProperties,
+    EntityNames,
     PlacesConfig,
     RegionConfig,
 )
 
-TAGS = ["name", "wikidata"]
-COLUMNS = [
-    "geometry",
-    "name_area",
-    "wikidata_area",
-    "id_area",
-    "osm_url_area",
-    "count",
-    "sqkm",
-    "population",
-    "count_by_sqkm",
-    "count_by_pop",
-    "normalize_count",
-    "normalize_count_by_sqkm",
-    "normalize_count_by_pop",
-]
-
 
 class EnrichAttributes:
-    def add_attributes(self, entity, id, geo_props):
-        if intersect := {"id", "osm_url"}.intersection(geo_props.keys()):
+    def add_attributes(self, o: osm_entity_bits, id: str, entity_name: EntityNames):
+        geo_interface = getattr(o, "__geo_interface__", None)
+        # Filter out objects without geo_interface
+        if geo_interface is None:
+            logging.warning(f"Removed {entity_name}: {id}. Missing geo_interface.")
+            return True
+        geo_props: dict = geo_interface["properties"]
+        # Filter out objects if properties would be overwritten (should not happen)
+        if intersect := set(
+            [EnrichProperties.osm_id, EnrichProperties.osm_url]
+        ).intersection(geo_props.keys()):
             logging.warning(f"Filtered {id=} with {intersect=}")
             return True
-        geo_props["id"] = f"{entity[0]}{id}"
-        geo_props["osm_url"] = f"https://www.osm.org/{entity}/{id}"
+        geo_props[EnrichProperties.osm_id] = f"{entity_name[0]}{id}"
+        geo_props[EnrichProperties.osm_url] = f"https://www.osm.org/{entity_name}/{id}"
+        geo_props[DefaultTags.wikidata] = geo_props.pop(DefaultTags.wikidata, None)
         return False
 
-    def area(self, a):
-        geo_props = a.__geo_interface__["properties"]
-        geo_props["wikidata_area"] = geo_props.get("wikidata")
+    def area(self, a: Area):
         if a.from_way():
-            return self.add_attributes(
-                entity="way", id=a.orig_id(), geo_props=geo_props
-            )
-        return self.add_attributes(
-            entity="relation", id=a.orig_id(), geo_props=geo_props
-        )
+            return self.add_attributes(a, a.orig_id(), EntityNames.way)
+        return self.add_attributes(a, a.orig_id(), EntityNames.relation)
 
-    def node(self, n):
-        return self.add_attributes(
-            entity="node", id=n.id, geo_props=n.__geo_interface__["properties"]
-        )
+    def node(self, n: Node):
+        return self.add_attributes(n, n.id, EntityNames.node)
 
-    def way(self, n):
-        return self.add_attributes(
-            entity="way", id=n.id, geo_props=n.__geo_interface__["properties"]
-        )
+    def way(self, w: Way):
+        return self.add_attributes(w, w.id, EntityNames.way)
 
-    def relation(self, n):
-        return self.add_attributes(
-            entity="relation", id=n.id, geo_props=n.__geo_interface__["properties"]
-        )
+    def relation(self, r: Relation):
+        return self.add_attributes(r, r.id, EntityNames.relation)
 
 
 def extract_places(config: PlacesConfig, path: Path) -> GeoDataFrame:
-    tags_to_keep = TAGS + list(config.tags) + config.keys
     fp = osmium.FileProcessor(path).with_areas().with_filter(EmptyTagFilter())
     if config.entity:
         fp.with_filter(EntityFilter(ENTITY_MAPPING[config.entity]))
@@ -90,10 +75,13 @@ def extract_places(config: PlacesConfig, path: Path) -> GeoDataFrame:
         else:
             tags = [(key, value)]
         fp.with_filter(TagFilter(*tags))
+    tags_to_keep = list(DefaultTags) + list(config.tags) + config.keys
     fp.with_filter(GeoInterfaceFilter(tags=tags_to_keep)).with_filter(
         EnrichAttributes()
     )
-    return GeoDataFrame.from_features(fp).drop_duplicates("id")
+    return GeoDataFrame.from_features(fp, crs=4326).drop_duplicates(
+        EnrichProperties.osm_id
+    )
 
 
 def extract_areas(region_config: RegionConfig, path: Path) -> GeoDataFrame:
@@ -101,11 +89,11 @@ def extract_areas(region_config: RegionConfig, path: Path) -> GeoDataFrame:
     clip_config = region_config.clip
     if not gdf.empty and clip_config.bbox:
         logging.info(f"Area is clipped to {clip_config.bbox=}")
-        gdf = gdf.clip(clip_config.bbox)
+        gdf = gdf.clip(clip_config.bbox, keep_geom_type=True)
     if not gdf.empty and any(clip_config.tags):
         logging.info(f"Area is clipped to {clip_config.tags=}")
         clip_mask = extract_places(config=clip_config, path=path)
-        gdf = gdf.clip(clip_mask)
+        gdf = gdf.clip(clip_mask, keep_geom_type=True)
     return gdf
 
 
@@ -130,70 +118,81 @@ SELECT ?place ?population WHERE {{
 
 def get_populations(
     ids: NDArray[np.str_], file: str = "data/populations.json"
-) -> dict[str, str]:
+) -> dict[str, float]:
     try:
         with open(file) as f:
             populations = json.load(f)
     except FileNotFoundError:
         populations = {}
     if missing_ids := [x for x in ids if x not in populations]:
-        retrieved_pops = fetch_wikidata_populations(ids=missing_ids)
-        populations |= {x: retrieved_pops.get(x, "null") for x in missing_ids}
+        chunks = [missing_ids[i : i + 20] for i in range(0, len(missing_ids), 20)]
+        for chunk in chunks:
+            retrieved_pops = fetch_wikidata_populations(ids=chunk)
+            populations |= {x: retrieved_pops.get(x, "null") for x in chunk}
         with open(file, mode="w") as f:
             json.dump(populations, f)
-    return {x: int(populations[x]) if populations[x] != "null" else np.nan for x in ids}
+    return {
+        x: float(populations[x]) if str(populations[x]).isnumeric() else np.nan
+        for x in ids
+    }
 
 
 def get_joined_gdf(
     gdf_areas: GeoDataFrame, gdf_places: GeoDataFrame, with_populations: bool = False
 ) -> GeoDataFrame:
+    # Min-max normalization for columns
+    def normalize(srs: GeoSeries) -> GeoSeries:
+        return (srs - srs.min()) / (srs.max() - srs.min())
+
+    # Suffix to use for joining
+    area, place = "area", "place"
+    # Suffixed right geometry column
+    gdf_places[EnrichProperties.geometry.suffix(place)] = gdf_places[
+        EnrichProperties.geometry
+    ]
     gdf = gdf_areas.sjoin(
         df=gdf_places,
         how="left",
         predicate="contains",
-        lsuffix="area",
-        rsuffix="place",
+        lsuffix=area,
+        rsuffix=place,
     )
-    normalize_columns = ["count", "count_by_sqkm"]
-    gdf["count"] = gdf.groupby("id_area")["id_place"].transform("count")
-    gdf["sqkm"] = gdf.set_crs(epsg=4326).to_crs(epsg=25833).geometry.area / 1_000_000
-    gdf["count_by_sqkm"] = gdf["count"] / gdf["sqkm"]
+    # Suffix left geometry column
+    gdf.rename_geometry(EnrichProperties.geometry.suffix(area), inplace=True)
+    # Enrich columns
+    gdf[Columns.total.value] = gdf.groupby(EnrichProperties.osm_id.suffix(area))[
+        EnrichProperties.osm_id.suffix(place)
+    ].transform("count")
+    gdf[Columns.sqkm.value] = gdf.to_crs(epsg=32633).geometry.area / 1_000_000
+    gdf[Columns.total_by_sqkm.value] = gdf[Columns.total] / gdf[Columns.sqkm]
+    # Normalize columns
+    gdf[Columns.by_total.value] = normalize(gdf[Columns.total])
+    gdf[Columns.by_area.value] = normalize(gdf[Columns.total_by_sqkm])
+    # Optionally enrich with population data
     if with_populations:
-        column = (
-            "wikidata_area_area"
-            if "wikidata_area_area" in gdf.columns
-            else "wikidata_area"
+        wiki_col = DefaultTags.wikidata.suffix(area)
+        populations = get_populations(
+            ids=gdf[gdf[wiki_col].notnull()][wiki_col].unique()
         )
-        populations = get_populations(ids=gdf[gdf[column].notnull()][column].unique())
-        gdf["population"] = gdf[column].map(populations)
-        gdf["count_by_pop"] = gdf["count"] / gdf["population"]
+        gdf[Columns.population.value] = gdf[wiki_col].map(populations)
         # Handle the case that population is 0
-        gdf.replace([np.inf, -np.inf], np.nan, inplace=True)
-        normalize_columns.append("count_by_pop")
-    for col in normalize_columns:
-        gdf[f"normalize_{col}"] = (gdf[col] - gdf[col].min()) / (
-            gdf[col].max() - gdf[col].min()
+        gdf[Columns.total_by_pop.value] = gdf.apply(
+            lambda row: row[Columns.total] / row[Columns.population]
+            if row[Columns.population] > 0
+            else np.nan,
+            axis=1,
         )
-    columns = [c for c in COLUMNS if c in gdf.columns]
-    return gdf.drop_duplicates("id_area")[columns].rename(
-        columns={
-            "name_area": "name",
-            "id_area": "id",
-            "osm_url_area": "osm_url",
-            "wikidata_area": "wikidata",
-            "normalize_count": "total",
-            "normalize_count_by_sqkm": "by_area",
-            "normalize_count_by_pop": "by_population",
-        }
-    )
+        gdf[Columns.by_population.value] = normalize(gdf[Columns.total_by_pop])
+
+    osm_id_cols = [EnrichProperties.osm_id.suffix(s) for s in [area, place]]
+    return gdf.drop_duplicates(osm_id_cols).reset_index(drop=True)
 
 
 def prepare_data(
     config: DinerOsmConfig, options: Namespace, version_paths: dict[str, Path]
-) -> tuple[dict[str, GeoDataFrame], dict[str, GeoDataFrame]]:
+) -> dict[str, GeoDataFrame]:
     region_config = config.region_configs[options.region]
-    place_gdfs = {}
-    join_gdfs = {}
+    gdfs = {}
     if options.version_for_areas != "false":
         gdf_areas = extract_areas(
             region_config=region_config,
@@ -212,27 +211,24 @@ def prepare_data(
         if gdf_places.empty:
             continue
         gdf_places = gdf_places.clip(gdf_areas)
-        place_gdfs[version] = gdf_places
-        join_gdfs[version] = get_joined_gdf(
+        gdfs[version] = get_joined_gdf(
             gdf_areas=gdf_areas,
             gdf_places=gdf_places,
             with_populations=options.with_populations,
         )
-    return place_gdfs, join_gdfs
+    return gdfs
 
 
-def save_data(
-    options: Namespace,
-    place_gdfs: dict[str, GeoDataFrame],
-    join_gdfs: dict[str, GeoDataFrame],
-) -> None:
+def save_data(options: Namespace, gdfs: dict[str, GeoDataFrame]) -> None:
     path: Path = options.output_dir
     path.mkdir(parents=True, exist_ok=True)
-    for version, gdf in place_gdfs.items():
-        filename = Path(path, f"place_{version}.geojson")
-        gdf.to_file(filename, driver="GeoJSON")
-        logging.info(f"Saved gdf to {filename}")
-    for version, gdf in join_gdfs.items():
-        filename = Path(path, f"join_{version}.geojson")
+    for version, gdf in gdfs.items():
+        filename = Path(path, f"{version}.geojson")
+        # Only keep the areas geometry when writing to file
+        gdf.drop(
+            columns=(EnrichProperties.geometry.suffix("place")),
+            inplace=True,
+            errors="ignore",
+        )
         gdf.to_file(filename, driver="GeoJSON")
         logging.info(f"Saved gdf to {filename}")

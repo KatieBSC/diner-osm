@@ -7,6 +7,13 @@ from diner_osm.config import (
     RegionConfig,
 )
 
+from .helper import generate_test_data
+
+
+@pytest.fixture(scope="session", autouse=True)
+def write_data() -> None:
+    generate_test_data()
+
 
 @pytest.fixture
 def diner_osm_config() -> DinerOsmConfig:
@@ -23,7 +30,7 @@ def diner_osm_config() -> DinerOsmConfig:
                     entity="area",
                     tags={"admin_level": "8", "boundary": "administrative"},
                 ),
-                clip=ClipConfig(),
+                clip=ClipConfig(entity="area"),
                 places=PlacesConfig(
                     entity="node",
                     keys=["name"],
@@ -31,16 +38,16 @@ def diner_osm_config() -> DinerOsmConfig:
                 ),
             ),
             "good-doberan": RegionConfig(
+                areas=PlacesConfig(entity="area"),
+                clip=ClipConfig(entity="area"),
                 places=PlacesConfig(
-                    entity="",
+                    entity=None,
                     keys=[],
                     tags={
                         "amenity": ["post_office", "bank"],
                         "operator": ["Deutsche Post", "Postbank", "Deutsche Post AG"],
                     },
                 ),
-                clip=ClipConfig(),
-                areas=PlacesConfig(),
             ),
         },
     )

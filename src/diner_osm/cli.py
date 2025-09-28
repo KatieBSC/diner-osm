@@ -74,20 +74,15 @@ def main():
     config = get_config()
     options = get_arg_parser(config).parse_args()
     version_paths = ensure_data(config=config, options=options)
-    place_gdfs, join_gdfs = prepare_data(
-        config=config, options=options, version_paths=version_paths
-    )
+    gdfs = prepare_data(config=config, options=options, version_paths=version_paths)
     match options.command:
         case "prepare-data":
-            return save_data(
-                options=options, place_gdfs=place_gdfs, join_gdfs=join_gdfs
-            )
+            return save_data(options=options, gdfs=gdfs)
         case "visualize":
             if layout := plot_data(
                 config=config,
                 options=options,
-                join_gdfs=join_gdfs,
-                place_gdfs=place_gdfs,
+                gdfs=gdfs,
             ):
                 show(layout)
             else:

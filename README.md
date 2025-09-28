@@ -51,24 +51,22 @@ uv run diner-osm visualize --help
 ```
 
 ### Prepare Data
-This subcommand prepares an areas GeoDataFrame and a places GeoDataFrame for the
-specified region and version(s).
+This subcommand prepares a GeoJSON file for the specified region and version(s).
 
 For more details on the areas and places configurations, see 
 [Configuration](#configuration).
 
 #### Run latest
-The command below will produce two files: `place_latest.geojson` and `join_latest.geojson`.
-By default, these files will be saved to the `data/` directory.
+The command below will produce one file: `latest.geojson`.
+By default, this file will be saved to the `data/` directory.
 
 ```bash
 uv run diner-osm prepare-data --region darmstadt
 ```
 
 #### Run latest and save to specific output directory
-The command below will produce two files: `place_latest.geojson` and
-`join_latest.geojson`.
-These files will be saved to the `data/darmstadt/` directory.
+The command below will produce one file: `latest.geojson`.
+This file will be saved to the `data/darmstadt/` directory.
 
 ```bash
 uv run diner-osm prepare-data --region darmstadt --output-dir data/darmstadt
@@ -80,7 +78,7 @@ uv run diner-osm prepare-data --region darmstadt --versions latest --with-popula
 ```
 
 #### Run multiple versions
-The command below will produce a total of 6 files: a place and a join file per version.
+The command below will produce a total of 3 files: one file per version.
 
 ```bash
 uv run diner-osm prepare-data --region darmstadt --versions 2023 2024 latest
@@ -135,7 +133,7 @@ latest = "latest.osm.pbf"
 
 [darmstadt.areas]
 # Area filters to use for aggregating results
-entity = "area"
+# Uses entity = "area" if any tags provided
 tags.boundary = "administrative"
 tags.admin_level = "8"
 
@@ -145,7 +143,7 @@ tags.admin_level = "8"
 bbox = [11.901, 54.103, 11.9038, 54.1047]
 
 # Clip results by a specific area
-entity = "area"
+# Uses entity = "area" if any tags provided
 tags.boundary = "administrative"
 tags.admin_level = "6"
 tags.name = "Darmstadt"
