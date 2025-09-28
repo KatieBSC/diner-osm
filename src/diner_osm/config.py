@@ -7,26 +7,31 @@ from osmium.osm import AREA, NODE, RELATION, WAY
 
 
 class EnrichProperties(StrEnum):
+    geometry = "geometry"
     osm_id = "osm_id"
     osm_url = "osm_url"
-    wikidata_id = "wikidata_id"
+
+    def suffix(self, string: str):
+        return f"{str(self)}_{string}"
 
 
 class DefaultTags(StrEnum):
     name_ = "name"
     wikidata = "wikidata"
 
+    def suffix(self, string: str):
+        return f"{str(self)}_{string}"
+
 
 class Columns(StrEnum):
+    total = "total"
+    sqkm = "sqkm"
+    population = "population"
+    total_by_sqkm = "total_by_sqkm"
+    total_by_pop = "total_by_pop"
+    by_total = "by_total"
     by_area = "by_area"
     by_population = "by_population"
-    count_ = "count"
-    count_by_pop = "count_by_pop"
-    count_by_sqkm = "count_by_sqkm"
-    geometry = "geometry"
-    population = "population"
-    sqkm = "sqkm"
-    total = "total"
 
 
 class EntityNames(StrEnum):

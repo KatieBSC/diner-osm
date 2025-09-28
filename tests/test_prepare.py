@@ -203,34 +203,40 @@ def test_get_joined_gdf(get_populations: MagicMock, with_populations: bool) -> N
 
     # Should have expected ids
     assert_series_equal(
-        joined_gdf[EnrichProperties.osm_id], pd.Series(["w0", "w1"]), check_names=False
+        joined_gdf[EnrichProperties.osm_id.suffix("area")],
+        pd.Series(["w0", "w0", "w1"]),
+        check_names=False,
     )
     # Should have expected enriched columns
     assert_series_equal(
-        joined_gdf[Columns.count_], pd.Series([2, 1]), check_names=False
+        joined_gdf[Columns.total], pd.Series([2, 2, 1]), check_names=False
     )
     assert_series_equal(
-        joined_gdf[Columns.sqkm], pd.Series([9834.15, 13012.82]), check_names=False
+        joined_gdf[Columns.sqkm],
+        pd.Series([9834.15, 9834.15, 13012.82]),
+        check_names=False,
     )
     assert_series_equal(
-        joined_gdf[Columns.count_by_sqkm],
-        pd.Series([2 / 9834.15, 1 / 13012.82]),
+        joined_gdf[Columns.total_by_sqkm],
+        pd.Series([2 / 9834.15, 2 / 9834.15, 1 / 13012.82]),
         check_names=False,
     )
     if with_populations:
         get_populations.assert_called_once_with(ids=np.array(["Q100"]))
         assert_series_equal(
-            joined_gdf[Columns.population], pd.Series([100, np.nan]), check_names=False
+            joined_gdf[Columns.population],
+            pd.Series([100, 100, np.nan]),
+            check_names=False,
         )
         assert_series_equal(
-            joined_gdf[Columns.count_by_pop],
-            pd.Series([0.02, np.nan]),
+            joined_gdf[Columns.total_by_pop],
+            pd.Series([0.02, 0.02, np.nan]),
             check_names=False,
         )
     else:
         get_populations.assert_not_called()
         assert Columns.population not in joined_gdf.columns
-        assert Columns.count_by_pop not in joined_gdf.columns
+        assert Columns.total_by_pop not in joined_gdf.columns
 
 
 @pytest.mark.parametrize("version_for_areas", ["latest", "false"])
@@ -282,23 +288,16 @@ def test_prepare_data(
 @patch("diner_osm.prepare.GeoDataFrame.to_file")
 def test_save_data(to_file_patch: MagicMock, cli_options: Namespace) -> None:
     cli_options.output_dir = Path("data/bad-doberan")
-    place_gdfs, join_gdfs = {}, {}
+    gdfs = {}
     for version in cli_options.versions:
-        place_gdfs[version] = GeoDataFrame()
-        join_gdfs[version] = GeoDataFrame()
+        gdfs[version] = GeoDataFrame()
     with patch("diner_osm.prepare.Path.mkdir"):
-        save_data(cli_options, place_gdfs, join_gdfs)
-    # Should have 2 file calls per version
-    assert to_file_patch.call_count == 4
+        save_data(cli_options, gdfs)
+    # Should have 1 file call per version
+    assert to_file_patch.call_count == len(cli_options.versions)
     to_file_patch.assert_has_calls(
         [
-            call(Path(f"data/bad-doberan/place_{version}.geojson"), driver="GeoJSON")
-            for version in cli_options.versions
-        ]
-    )
-    to_file_patch.assert_has_calls(
-        [
-            call(Path(f"data/bad-doberan/join_{version}.geojson"), driver="GeoJSON")
+            call(Path(f"data/bad-doberan/{version}.geojson"), driver="GeoJSON")
             for version in cli_options.versions
         ]
     )

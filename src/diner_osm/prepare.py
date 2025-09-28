@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import osmium
 import requests
-from geopandas import GeoDataFrame
+from geopandas import GeoDataFrame, GeoSeries
 from numpy.typing import NDArray
 from osmium.filter import (
     EmptyTagFilter,
@@ -38,14 +38,14 @@ class EnrichAttributes:
             return True
         geo_props: dict = geo_interface["properties"]
         # Filter out objects if properties would be overwritten (should not happen)
-        if intersect := set(EnrichProperties).intersection(geo_props.keys()):
+        if intersect := set(
+            [EnrichProperties.osm_id, EnrichProperties.osm_url]
+        ).intersection(geo_props.keys()):
             logging.warning(f"Filtered {id=} with {intersect=}")
             return True
         geo_props[EnrichProperties.osm_id] = f"{entity_name[0]}{id}"
         geo_props[EnrichProperties.osm_url] = f"https://www.osm.org/{entity_name}/{id}"
-        geo_props[EnrichProperties.wikidata_id] = geo_props.pop(
-            DefaultTags.wikidata, None
-        )
+        geo_props[DefaultTags.wikidata] = geo_props.pop(DefaultTags.wikidata, None)
         return False
 
     def area(self, a: Area):
@@ -137,7 +137,16 @@ def get_populations(
 def get_joined_gdf(
     gdf_areas: GeoDataFrame, gdf_places: GeoDataFrame, with_populations: bool = False
 ) -> GeoDataFrame:
+    # Min-max normalization for columns
+    def normalize(srs: GeoSeries) -> GeoSeries:
+        return (srs - srs.min()) / (srs.max() - srs.min())
+
+    # Suffix to use for joining
     area, place = "area", "place"
+    # Suffixed right geometry column
+    gdf_places[EnrichProperties.geometry.suffix(place)] = gdf_places[
+        EnrichProperties.geometry
+    ]
     gdf = gdf_areas.sjoin(
         df=gdf_places,
         how="left",
@@ -145,51 +154,38 @@ def get_joined_gdf(
         lsuffix=area,
         rsuffix=place,
     )
-    gdf[Columns.count_] = gdf.groupby(f"{EnrichProperties.osm_id}_{area}")[
-        f"{EnrichProperties.osm_id}_{place}"
+    # Suffix left geometry column
+    gdf.rename_geometry(EnrichProperties.geometry.suffix(area), inplace=True)
+    # Enrich columns
+    gdf[Columns.total.value] = gdf.groupby(EnrichProperties.osm_id.suffix(area))[
+        EnrichProperties.osm_id.suffix(place)
     ].transform("count")
-    gdf[Columns.sqkm] = gdf.to_crs(epsg=32633).geometry.area / 1_000_000
-    gdf[Columns.count_by_sqkm] = gdf[Columns.count_] / gdf[Columns.sqkm]
+    gdf[Columns.sqkm.value] = gdf.to_crs(epsg=32633).geometry.area / 1_000_000
+    gdf[Columns.total_by_sqkm.value] = gdf[Columns.total] / gdf[Columns.sqkm]
+    # Normalize columns
+    gdf[Columns.by_total.value] = normalize(gdf[Columns.total])
+    gdf[Columns.by_area.value] = normalize(gdf[Columns.total_by_sqkm])
+    # Optionally enrich with population data
     if with_populations:
-        column = f"{EnrichProperties.wikidata_id}_{area}"
-        populations = get_populations(ids=gdf[gdf[column].notnull()][column].unique())
-        gdf[Columns.population] = gdf[column].map(populations)
-        gdf[Columns.count_by_pop] = gdf[Columns.count_] / gdf[Columns.population]
+        wiki_col = DefaultTags.wikidata.suffix(area)
+        populations = get_populations(
+            ids=gdf[gdf[wiki_col].notnull()][wiki_col].unique()
+        )
+        gdf[Columns.population.value] = gdf[wiki_col].map(populations)
+        gdf[Columns.total_by_pop.value] = gdf[Columns.total] / gdf[Columns.population]
         # Handle the case that population is 0
         gdf.replace([np.inf, -np.inf], np.nan, inplace=True)
-    for col in [Columns.count_, Columns.count_by_sqkm, Columns.count_by_pop]:
-        if col not in gdf:
-            continue
-        gdf[f"normalize_{col}"] = (gdf[col] - gdf[col].min()) / (
-            gdf[col].max() - gdf[col].min()
-        )
+        gdf[Columns.by_population.value] = normalize(gdf[Columns.total_by_pop])
 
-    gdf.rename(
-        columns={
-            f"{DefaultTags.name_}_{area}": DefaultTags.name_,
-            f"{DefaultTags.wikidata}_{area}": DefaultTags.wikidata,
-            f"{EnrichProperties.osm_id}_{area}": EnrichProperties.osm_id,
-            f"{EnrichProperties.osm_url}_{area}": EnrichProperties.osm_url,
-            f"normalize_{Columns.count_}": Columns.total,
-            f"normalize_{Columns.count_by_pop}": Columns.by_population,
-            f"normalize_{Columns.count_by_sqkm}": Columns.by_area,
-        },
-        inplace=True,
-    )
-    columns = (
-        list(Columns)
-        + list(DefaultTags)
-        + [EnrichProperties.osm_id, EnrichProperties.osm_url]
-    )
-    return gdf.filter(columns).drop_duplicates(EnrichProperties.osm_id)
+    osm_id_cols = [EnrichProperties.osm_id.suffix(s) for s in [area, place]]
+    return gdf.drop_duplicates(osm_id_cols).reset_index(drop=True)
 
 
 def prepare_data(
     config: DinerOsmConfig, options: Namespace, version_paths: dict[str, Path]
-) -> tuple[dict[str, GeoDataFrame], dict[str, GeoDataFrame]]:
+) -> dict[str, GeoDataFrame]:
     region_config = config.region_configs[options.region]
-    place_gdfs = {}
-    join_gdfs = {}
+    gdfs = {}
     if options.version_for_areas != "false":
         gdf_areas = extract_areas(
             region_config=region_config,
@@ -208,27 +204,24 @@ def prepare_data(
         if gdf_places.empty:
             continue
         gdf_places = gdf_places.clip(gdf_areas)
-        place_gdfs[version] = gdf_places
-        join_gdfs[version] = get_joined_gdf(
+        gdfs[version] = get_joined_gdf(
             gdf_areas=gdf_areas,
             gdf_places=gdf_places,
             with_populations=options.with_populations,
         )
-    return place_gdfs, join_gdfs
+    return gdfs
 
 
-def save_data(
-    options: Namespace,
-    place_gdfs: dict[str, GeoDataFrame],
-    join_gdfs: dict[str, GeoDataFrame],
-) -> None:
+def save_data(options: Namespace, gdfs: dict[str, GeoDataFrame]) -> None:
     path: Path = options.output_dir
     path.mkdir(parents=True, exist_ok=True)
-    for version, gdf in place_gdfs.items():
-        filename = Path(path, f"place_{version}.geojson")
-        gdf.to_file(filename, driver="GeoJSON")
-        logging.info(f"Saved gdf to {filename}")
-    for version, gdf in join_gdfs.items():
-        filename = Path(path, f"join_{version}.geojson")
+    for version, gdf in gdfs.items():
+        filename = Path(path, f"{version}.geojson")
+        # Only keep the areas geometry when writing to file
+        gdf.drop(
+            columns=(EnrichProperties.geometry.suffix("place")),
+            inplace=True,
+            errors="ignore",
+        )
         gdf.to_file(filename, driver="GeoJSON")
         logging.info(f"Saved gdf to {filename}")

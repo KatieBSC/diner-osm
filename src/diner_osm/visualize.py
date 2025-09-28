@@ -22,30 +22,39 @@ from diner_osm.config import Columns, DefaultTags, DinerOsmConfig, EnrichPropert
 def plot_data(
     config: DinerOsmConfig,
     options: Namespace,
-    join_gdfs: dict[str, GeoDataFrame],
-    place_gdfs: dict[str, GeoDataFrame],
+    gdfs: dict[str, GeoDataFrame],
 ) -> Row | None:
-    area_sources = {
-        (
+    area_sources, place_sources = {}, {}
+    plot_columns = list(EnrichProperties) + [DefaultTags.name_]
+    for version, gdf in gdfs.items():
+        key = (
             datetime.today().strftime("%Y.%m")
             if version == "latest"
             else f"{version}.01"
-        ): gdf.to_crs(epsg=3857).to_json()
-        for version, gdf in join_gdfs.items()
-    }
-    place_sources = {
-        (
-            datetime.today().strftime("%Y.%m")
-            if version == "latest"
-            else f"{version}.01"
-        ): gdf.to_crs(epsg=3857).to_json()
-        for version, gdf in place_gdfs.items()
-    }
+        )
+        area_sources[key] = (
+            gdf.rename(columns={col.suffix("area"): col for col in plot_columns})
+            .drop(columns=(EnrichProperties.geometry.suffix("place")))
+            .drop_duplicates(EnrichProperties.osm_id)
+            .set_geometry(EnrichProperties.geometry)
+            .to_crs(epsg=3857)
+            .to_json()
+        )
+        # Drop rows without place geometry (areas without places)
+        gdf = gdf[gdf[EnrichProperties.geometry.suffix("place")].notnull()]
+        place_sources[key] = (
+            gdf.rename(columns={col.suffix("place"): col for col in plot_columns})
+            .drop(columns=(EnrichProperties.geometry.suffix("area")))
+            .drop_duplicates(EnrichProperties.osm_id)
+            .set_geometry(EnrichProperties.geometry)
+            .to_crs(epsg=3857)
+            .to_json()
+        )
     if not place_sources or not area_sources:
         return None
 
     TOOLTIPS = [(DefaultTags.name_, f"@{DefaultTags.name_}")]
-    CMAP_COLUMNS = [Columns.total, Columns.by_area]
+    CMAP_COLUMNS = [Columns.by_total, Columns.by_area]
     if options.with_populations:
         CMAP_COLUMNS.append(Columns.by_population)
 
