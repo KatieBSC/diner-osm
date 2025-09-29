@@ -107,11 +107,12 @@ def plot_data(
         alpha=0.8,
         source=geo_source,
         color="white",
+        line_color="black",
         visible=False,
     )
     places = plot.patches(
         fill_color="white",
-        line_color="white",
+        line_color="black",
         line_width=0.6,
         alpha=0.8,
         source=geo_source,
