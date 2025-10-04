@@ -165,10 +165,10 @@ tags.cuisine = "ice_cream"
 
 ## Talks
 
+### [PyCon Estonia 2025](https://pycon.ee/)
+
+The slides used during this talk can be found [here](assets/PyConEE_2025.pdf).
+
 ### [PyCon DE & PyData 2025](https://2025.pycon.de/)
 
 The slides used during this talk can be found [here](assets/PyConDE_2025.pdf).
-
-### [PyCon Estonia 2025](https://pycon.ee/)
-
-Upcoming
